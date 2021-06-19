@@ -69,11 +69,26 @@ def main(inargs):
     bv_lat = df.loc[0:20, "lat_vort"]; bv_lon = df.loc[0:20, "lon_vort"]
     bv_time = df.loc[0:20, "Time"]
 
+    # interpolate N768 data onto 4p4 grid 
+    u_gl = gdata.u.interp(longitude_1=data.u["longitude"], 
+                          latitude=data.u["latitude"], 
+                          method="linear")
+    v_gl = gdata.v.interp(longitude=data.v["longitude"],
+                          latitude_1=data.v["latitude"], 
+                          method="linear")
+    pv_gl = gdata.field83.interp(longitude=data.v["longitude"],
+                          latitude=data.v["latitude"], 
+                          method="linear")
+    w_gl  = gdata.dz_dt.interp(longitude=data.v["longitude"],
+                               latitude=data.v["latitude"], 
+                               method="linear")
+
     # if analysing circulation
     if inargs.var == 'circ':
         # calculate circulation at each time and store in array for plotting 
-        circ_arr = fp.calc_circ(data, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
-        circ_gl_arr = fp.calc_circ(gdata, bv_lat, bv_lon, glb=True, mlev=inargs.mlev, r0=inargs.r0)
+        circ_arr = fp.calc_circ(data.u, data.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
+        circ_gl_arr = fp.calc_circ(u_gl, v_gl, bv_lat, bv_lon, glb=True, 
+                                   mlev=inargs.mlev, r0=inargs.r0)
         # set up plot 
         fig, ax = plt.subplots(figsize=(10,6))
         fili = './circ_oct2018_{0}deg.png'.format(inargs.r0)

@@ -80,15 +80,16 @@ def subset(data, bounds, var='', vtime=[]):
     return data
 
 
-def calc_circ(data, bv_lat, bv_lon, glb=False, plev=800, mlev=1.810000e+03, r0=3.0):
+def calc_circ(u, v, bv_lat, bv_lon, glb=False, plev=800, mlev=1.810000e+03, r0=3.0):
     """                                                                                  
     calculate circulation following the vortex for multiple validity times               
     storm the values in an array for plotting                                            
                                                                                          
-    Args:                                                                                
-      data (Xarray DataArray): multi-dimensional data array                              
-      bv_lat (Pandas DataFrame): vortex centre latitude                                  
-      bv_lon (Pandas DataFrame): vortex centre longitude                                 
+    Args:
+      u (Xarray DataArray): multi-dimensional data array (zonal wind)
+      v (Xarray DataArray): multi-dimensional data array (meridional wind)
+      bv_lat (Pandas DataFrame): vortex centre latitude
+      bv_lon (Pandas DataFrame): vortex centre longitude
                                                                                          
     Kwargs:                                                                              
       glb (boolean): plot regional (4p4) or global (N768) data                           
@@ -98,7 +99,7 @@ def calc_circ(data, bv_lat, bv_lon, glb=False, plev=800, mlev=1.810000e+03, r0=3
     """
 
     # get size of time dimension                                                         
-    ntimes = data.t.shape[0]
+    ntimes = u.t.shape[0]
     times = np.arange(0, ntimes)
 
     # initialise array (better way to do this?)                                          
@@ -114,13 +115,13 @@ def calc_circ(data, bv_lat, bv_lon, glb=False, plev=800, mlev=1.810000e+03, r0=3
     for i, it in enumerate(t_ind):
         # read in wind components on single level and calculate relative vorticity        
         if glb:
-            u = data.u[it,:,:,:].sel(hybrid_ht_1=int(mlev) )
-            v = data.v[it,:,:,:].sel(hybrid_ht_1=int(mlev) )
-            vort = mpcalc.vorticity(u, v, dx = None, dy = None) * 100000
+            u0 = u[it,:,:,:].sel(hybrid_ht_1=int(mlev) )
+            v0 = v[it,:,:,:].sel(hybrid_ht_1=int(mlev) )
+            vort = mpcalc.vorticity(u0, v0, dx = None, dy = None) * 10000
         else:
-            u = data.u[it,:,:,:].sel(p=int(plev) )
-            v = data.v[it,:,:,:].sel(p=int(plev) )
-            vort = mpcalc.vorticity(u, v, dx = None, dy = None) * 10000
+            u0 = u[it,:,:,:].sel(p=int(plev) )
+            v0 = v[it,:,:,:].sel(p=int(plev) )
+            vort = mpcalc.vorticity(u0, v0, dx = None, dy = None) * 10000
 
         #vort = mpcalc.vorticity(u, v, dx = None, dy = None) * 100000
         vort.attrs['units'] = '10-5 s-1'
