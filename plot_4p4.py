@@ -47,7 +47,8 @@ def main(inargs):
     if inargs.hr == -12:
         nn = [103.0, 133.0, -3.0, 20.0]
     else:
-        nn = [93.0, 123.0, -3.0, 20.0]
+        #nn = [93.0, 123.0, -3.0, 20.0]
+        nn = [93.0, 130.0, -3.0, 21.0]
 
     # read in Kevin Hodges' Borneo vortex track data from text file
     df = pd.read_csv('/nobackup/earshar/borneo/bv_2018102112_track.csv',
@@ -203,14 +204,16 @@ def main(inargs):
             ht_coords = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
             # interpolate to new lat/lon grid 
             u_bar = u_gl.interp(longitude_1=v_gl["longitude"],
-                                hybrid_ht_1=ht_coords,
                                 method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                ht_coords)).swap_dims({"hybrid_ht_1":
+                                ht_coords)).swap_dims({"hybrid_ht_1": 
                                                        "height_levels"})
+
             # calculate mean over longitude and time 
             u_bar = u_bar.sel(longitude=slice(95.0, 120.0), 
                               latitude=slice(0.0,
                     15.0) ).mean(dim=['longitude','t']).sel(height_levels=slice(50, 15000))
+            print(u_bar)
+            exit()
 
             # interpolate to new levels straight before plotting
             ht_coords = np.arange(0, 15000, 250)
@@ -287,7 +290,11 @@ def main(inargs):
             for name in output_names:
                 var_name='{}'.format(name)
                 diri='/nobackup/earshar/borneo/SGTool/N768/oct/{0}/filter_4_8/conv_g7x_v5/'.format(inargs.sgt)
-                fn = '{0}/OUT_{1}_{2}_T{3:03d}.nc'.format(diri,name,sstr,inargs.hr)
+                if inargs.hr == 0:
+                    Tp = int(inargs.hr) + 12
+                else:
+                    Tp = int(inargs.hr)
+                fn = '{0}/OUT_{1}_{2}_T{3:03d}.nc'.format(diri,name,sstr,Tp)
                 variabledict[name] = iris.load(fn)[0]
                 variabledict[name].rename(name)
 
@@ -308,9 +315,12 @@ def main(inargs):
                                         nn[1]),latitude=slice(nn[2],nn[3]))
 
             # N768 MetUM 
-            Tp = int(inargs.hr)
-            gl_pe='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe{0:03d}.nc'.format(Tp-12)
-            gl_pb='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pb{0:03d}.nc'.format(Tp-12)
+            if inargs.hr == 0:
+                Tp = int(inargs.hr)
+            else:
+                Tp = int(inargs.hr) - 12
+            gl_pe='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe{0:03d}.nc'.format(Tp)
+            gl_pb='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pb{0:03d}.nc'.format(Tp)
             data_pe=xr.open_dataset(gl_pe).metpy.assign_crs(grid_mapping_name='latitude_longitude',
                                                             earth_radius=6371229.0)
             data_pb=xr.open_dataset(gl_pb).metpy.assign_crs(grid_mapping_name='latitude_longitude',
