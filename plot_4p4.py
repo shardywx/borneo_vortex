@@ -212,8 +212,6 @@ def main(inargs):
             u_bar = u_bar.sel(longitude=slice(95.0, 120.0), 
                               latitude=slice(0.0,
                     15.0) ).mean(dim=['longitude','t']).sel(height_levels=slice(50, 15000))
-            print(u_bar)
-            exit()
 
             # interpolate to new levels straight before plotting
             ht_coords = np.arange(0, 15000, 250)
