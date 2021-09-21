@@ -43,14 +43,11 @@ def main(inargs):
         era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
         era5 = xr.open_dataset(era_file, engine="cfgrib").metpy.parse_cf()
 
-    """
     # subset the data     
     if inargs.hr == -12:
         nn = [103.0, 133.0, -3.0, 20.0]
     else:
         nn = [93.0, 123.0, -3.0, 20.0]
-    """
-    nn = [98.0, 133.0, -3.0, 20.0]
 
     # read in Kevin Hodges' Borneo vortex track data from text file
     df = pd.read_csv('/nobackup/earshar/borneo/bv_2018102112_track.csv',
