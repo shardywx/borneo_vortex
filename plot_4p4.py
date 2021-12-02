@@ -21,7 +21,7 @@ from diagnosticSGsetup import output_names
 from custom_cmap import *
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 import func_4p4 as fp
 
@@ -40,15 +40,28 @@ def main(inargs):
 
     # read in ERA5 reanalysis data (xarray)
     if inargs.data == 'era5':
-        era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
+        if inargs.hr < 0:
+            era_file = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
+        else:
+            era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
         era5 = xr.open_dataset(era_file, engine="cfgrib").metpy.parse_cf()
 
     # subset the data     
-    if inargs.hr == -12:
-        nn = [103.0, 133.0, -3.0, 20.0]
+    if inargs.plot_type == 'xz':
+        nn = [87.0, 135.0, -3.0, 20.0]
+        #nn = [88.0, 130.0, -6.0, 23.0]
+        """
+        if inargs.hr < 12:
+            nn = [98.0, 133.0, -3.0, 20.0]
+        elif inargs.hr > 96: 
+            nn = [88.0, 123.0, -3.0, 20.0]
+        else:
+            nn = [93.0, 123.0, -3.0, 20.0]
+        """
     else:
-        #nn = [93.0, 123.0, -3.0, 20.0]
-        nn = [93.0, 130.0, -3.0, 21.0]
+        nn = [88.0, 130.0, -6.0, 23.0]
+        #nn = [98.0, 133.0, -3.0, 20.0]
+        #nn = [93.0, 130.0, -3.0, 21.0] / nn = [88.0, 125.0, -3.0, 21.0]
 
     # read in Kevin Hodges' Borneo vortex track data from text file
     df = pd.read_csv('/nobackup/earshar/borneo/bv_2018102112_track.csv',
@@ -187,7 +200,8 @@ def main(inargs):
         exit()
 
     # read in N768 data using xarray
-    if inargs.var == 'circ' or inargs.var == 'ubar':
+    if inargs.var == 'circ' or inargs.var == 'ubar' or inargs.var == 'node':
+
         # N768 file path 
         gl_pe='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe*.nc'
         # need to manually specify the coordinate reference system (CRS; ?)
@@ -197,8 +211,53 @@ def main(inargs):
                               longitude_1=slice(nn[0], nn[1]), latitude_1=slice(nn[2], nn[3]) )
         u_gl=gdata_pe.u; v_gl=gdata_pe.v; w_gl=gdata_pe.dz_dt; pv_gl=gdata_pe.field83
 
+        # calculate meridionally-averaged meridional wind (v_bar)
+        if inargs.var == 'node':
+
+            # set up height coordinates
+            ht_coords = gdata_pe.v['hybrid_ht_1'].data.astype('int32')
+
+            # interpolate to new lat/lon grid 
+            # EDIT FROM HERE (why are duplicate dimensions in 'v' but not 'u'?)
+            v_bar = v_gl.interp(latitude_1=u_gl["latitude"],
+                                method="linear").assign_coords(height_levels=("hybrid_ht",
+                                ht_coords)).swap_dims({"hybrid_ht":
+                                                       "height_levels"})
+
+            test = xr.DataArray.drop_duplicates(v_bar)
+
+            # calculate mean over latitude and time 
+            v_bar = v_bar.sel(longitude=slice(nn[0], nn[1]),
+                              latitude=slice(2.0,
+                    8.0) ).mean(dim=['latitude']).sel(height_levels=slice(50, 15000))
+
+            # interpolate to new height levels 
+            ht_coords = np.arange(0, 15000, 250)
+            arr = v_bar.interp(height_levels=ht_coords,method="linear")
+
+            # interpolate onto regular lat/lon grid before plotting 
+            lon_dim = np.arange(np.rint(arr.longitude[0].data),
+                                np.rint(arr.longitude[-1].data)+0.25, 0.25)
+            arr = arr.interp(longitude=lon_dim, method="linear")
+
+            # produce x-y plot of averaged meridional wind at two levels (e.g. 2 km and 7 km)
+            fig, ax = plt.subplots(figsize=(10,6))
+            fili = './vbar_oct2018_{0}deg.png'
+            test = arr.sel(height_levels=2000, t=dstr)
+
+            ax.plot(arr.longitude, arr.sel(height_levels=2000, t=dstr), 
+                    color='k', label='Meridional wind at 2 km')
+            ax.plot(arr.longitude, arr.sel(height_levels=7000, t=dstr), 
+                    color='b', label='Meridional wind at 7 km')
+            ax.grid(True); ax.legend(loc='upper left')
+            fig.savefig(fili,dpi=200)
+            exit()
+
         # calculate and plot zonally-averaged zonal wind (u_bar)
         if inargs.var == 'ubar':
+
+            print(gdata_pe)
+            exit()
         
             # set up height coordinates
             ht_coords = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
@@ -224,7 +283,7 @@ def main(inargs):
 
             # colour map and contour levels
             dl = 1.0; vmin = -20.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
             cb_label = 'Mean zonal wind (m s-1)'
 
             # set up plot and axes 
@@ -326,7 +385,6 @@ def main(inargs):
             gdata_pe=data_pe.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]),
                                   longitude_1=slice(nn[0], nn[1]), latitude_1=slice(nn[2], nn[3]) )
             gdata_pb=data_pb.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]) )
-
 
     # interpolate all data onto 4p4 grid 
 
@@ -463,6 +521,33 @@ def main(inargs):
                 # select pressure level to analyse 
                 pv = pv.sel(p=int(inargs.plev)); u = u.sel(p=int(inargs.plev))
                 v = v.sel(p=int(inargs.plev)) 
+            elif inargs.var == 'n2':
+                # read in data, combining two streams 
+                data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
+                                             data_pd.squeeze(['t', 't_1'])])
+                data = data.reindex(p=data.p[::-1])
+                u = data["u"]; v = data["v"]; temp = data["temp"]
+                u.attrs['units'] = 'm/s'; v.attrs['units'] = 'm/s'
+                q = data["q"] #q.attrs['units'] = 'g kg-1'
+                # interpolate onto same grid 
+                temp=temp.interp(longitude_1=u["longitude"],latitude_1=u["latitude"],
+                                 method="linear")
+                # calculate mixing ratio 
+                mix = mpcalc.mixing_ratio_from_specific_humidity(q)
+                # calculate potential temperature 
+                th = mpcalc.potential_temperature(temp['p'], temp); th.attrs['units'] = 'K'
+                # calculate density 
+                rho = mpcalc.density(th.p, temp, mix)
+                # next, calculate d(theta)/dp
+                th_dp = mpcalc.first_derivative(th, axis=0) / 100.; th_dp.attrs['units'] = 'K/Pa'
+                # then, calculate N^2 in pressure coordinates
+                n2 = th_dp * -( (rho * np.square(9.81) ) / th)
+                # finally, calculate effective PV gradient (q / N^2) 
+                pv_grad = (q / n2)
+                # select pressure level to analyse
+                pv_grad = pv_grad.sel(p=int(inargs.plev)); u = u.sel(p=int(inargs.plev))
+                v = v.sel(p=int(inargs.plev))
+
             else:
                 data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
                                              data_pd.squeeze(['t', 't_1'])])
@@ -534,7 +619,9 @@ def main(inargs):
 
         # call the plotting function, and save the file 
         if inargs.var == 'pv' and inargs.data != 'n768':
-            fig = fp.plot_pv(pv, u, v, inargs.data)
+            fig = fp.plot_pv(pv, u, v, df, inargs.data)
+        elif inargs.var == 'n2' and inargs.data != 'n768':
+            fig = fp.plot_n2(pv_grad, u, v, df, inargs.data)
         else:
             if inargs.data == 'n768' or inargs.data == 'sgt':
                 fig = fp.plot_xy(data_gl_sgt, inargs.data, inargs.var, df, 
@@ -558,47 +645,133 @@ def main(inargs):
     # vertical cross section (inargs.plot_type == 'xz')
     else:
 
+        """
+        Tidy this part of the script up, and incorporate into external function 
         #fig = fp.plot_xz(data, inargs.data, inargs.var, inargs.plane)
-        if int(inargs.hr) == 24:
+        """
+
+        if int(inargs.hr) == 0:
             if inargs.plane == 'ns':
                 if inargs.data == 'era5':
                     start = [1.0, 112.0]; end = [12.0, 112.0]
                 else:
                     start = [1.0, 112.0]; end = [12.0, 112.06] # 112º
-            else:
-                start = [4.0, 105.00]; end = [4.04, 118.00] # 3º
+            else: # E-W (lon-z)
+                if inargs.data == '4p4':
+                    start = [6.0, 89.00]; end = [6.0, 129.00] # 6º
+                else:
+                    start = [6.0, 89.00]; end = [6.04, 129.00] # 6º
+
+        elif int(inargs.hr) == 12:
+            if inargs.plane == 'ns':
+                if inargs.data == 'era5':
+                    start = [1.0, 112.0]; end = [12.0, 112.0]
+                else:
+                    start = [1.0, 112.0]; end = [12.0, 112.06] # 112º
+            else: # E-W (lon-z)
+                if inargs.data == '4p4':
+                    start = [5.5, 89.00]; end = [5.5, 129.00] # 5.5º  
+                else:
+                    start = [5.5, 89.00]; end = [5.54, 129.00] # 5.5º 
+
+        elif int(inargs.hr) == 24:
+            if inargs.plane == 'ns':
+                if inargs.data == 'era5':
+                    start = [1.0, 112.0]; end = [12.0, 112.0]
+                else:
+                    start = [1.0, 112.0]; end = [12.0, 112.06] # 112º
+            else: # E-W (lon-z)
+                if inargs.data == '4p4':
+                    start = [5.5, 89.00]; end = [5.50, 129.00] # 3º
+                else:
+                    start = [5.5, 89.00]; end = [5.54, 129.00] # 3º
+
         elif int(inargs.hr) == 36:
             if inargs.plane == 'ns':
                 if inargs.data == 'era5':
                     start = [1.0, 110.0]; end = [12.0, 110.0]
                 else:
                     start = [1.0, 110.0]; end = [12.0, 110.06] # 110º
-            else:
-                start = [4.0, 103.00]; end = [4.04, 116.00] # 4º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [5.5, 89.00]; end = [5.5, 129.00] # 4º
+                else:
+                    start = [5.5, 89.00]; end = [5.54, 129.00] # 4º 
+
         elif int(inargs.hr) == 48:
             if inargs.plane == 'ns':
                 if inargs.data == 'era5':
                     start = [2.0, 108.0]; end = [12.0, 108.0]
                 else:
                     start = [2.0, 108.0]; end = [12.0, 108.06] # 108º
-            else:
-                start = [7.0, 102.0]; end = [7.04, 114.0] # 6º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    # when running with end = [6.0, ...], got the error below (different from T+24)
+                    # IndexError: index 0 is out of bounds for axis 1 with size 0
+                    # same with T+72 below --> probably a simple explanation, but currently not sure 
+                    start = [0.0, 89.0]; end = [0.04, 129.0] # 6º
+                else:
+                    start = [0.0, 89.0]; end = [0.04, 129.0] # 6º 
+
         elif int(inargs.hr) == 60:
             if inargs.plane == 'ns':
                 if inargs.data == 'era5':
                     start = [2.0, 106.0]; end = [12.0, 106.0]
                 else:
                     start = [2.0, 106.0]; end = [12.0, 106.06] # 106º
-            else:
-                start = [7.0, 101.0]; end = [7.04, 114.0] # 7º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [6.5, 89.00]; end = [6.5, 129.0] # 7º
+                else:
+                    start = [6.5, 89.00]; end = [6.54, 129.0] # 7º
+
         elif int(inargs.hr) == 72:
             if inargs.plane == 'ns':
                 if inargs.data == 'era5':
                     start = [2.0, 102.0]; end = [12.0, 102.0]
                 else:
                     start = [2.0, 104.0]; end = [12.0, 104.06] # 102º
-            else:
-                start = [8.0, 98.0]; end = [8.04, 111.0] # 10º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [0.0, 89.00]; end = [0.04, 129.0] # 10º
+                else:
+                    start = [7.0, 89.00]; end = [7.04, 129.0] # 10º
+
+        elif int(inargs.hr) == 84:
+            if inargs.plane == 'ns':
+                if inargs.data == 'era5':
+                    start = [2.0, 102.0]; end = [12.0, 102.0]
+                else:
+                    start = [2.0, 104.0]; end = [12.0, 104.06] # 102º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [6.5, 89.00]; end = [6.5, 129.0] # 10º
+                else:
+                    start = [6.5, 89.00]; end = [6.54, 129.0] # 10º
+
+        elif int(inargs.hr) == 96:
+            if inargs.plane == 'ns':
+                if inargs.data == 'era5':
+                    start = [2.0, 102.0]; end = [12.0, 102.0]
+                else:
+                    start = [2.0, 104.0]; end = [12.0, 104.06] # 102º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [6.0, 89.00]; end = [6.0, 129.0] # 10º
+                else:
+                    start = [6.0, 89.00]; end = [6.04, 129.0] # 10º
+
+        elif int(inargs.hr) == 108:
+            if inargs.plane == 'ns':
+                if inargs.data == 'era5':
+                    start = [2.0, 102.0]; end = [12.0, 102.0]
+                else:
+                    start = [2.0, 104.0]; end = [12.0, 104.06] # 102º
+            else: # E-W (lon-z) 
+                if inargs.data == '4p4':
+                    start = [6.0, 89.0]; end = [6.0, 129.0] # 10º
+                else:
+                    start = [6.0, 89.0]; end = [6.04, 129.0] # 10º
 
         if inargs.plane == 'ns':
             var_dim = 'longitude'
@@ -613,13 +786,14 @@ def main(inargs):
             # avoid blank edges on x-z plot (troubleshooting)
             start[1] = start[1]- 0.5; end[1] = end[1] + 0.5
 
-        # remove unused dimensions 
+        # remove unused dimensions --> script won't run if you choose --cs='w' and --data='4p4'
         if inargs.data == '4p4':
             data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
                                          data_pd.squeeze(['t', 't_1'])])
             data = data.reindex(p=data.p[::-1])
             u = data["u"]; v = data["v"]; z = data["ht"]; temp = data["temp"]
-            q = data["q"] * 1000.; q.attrs['units'] = 'g kg-1'; omg = data["omega"]
+            q = data["q"] # * 1000.; q.attrs['units'] = 'g kg-1'
+            omg = data["omega"]
 
             # interpolate variables onto same grid 
             temp = temp.interp(longitude_1=u["longitude"],latitude_1=u["latitude"],method="linear")
@@ -630,6 +804,23 @@ def main(inargs):
             th_cs = th.sel(latitude=slice(start[0],end[0]),
                            longitude=slice(start[1],end[1]),
                            p=slice(1000.0, 150.0) ).squeeze(var_dim)
+
+            """
+            calculate effective PV gradient (q / N^2)
+            """
+
+            # first, calculate mixing ratio 
+            mix = mpcalc.mixing_ratio_from_specific_humidity(q)
+            # then, calculate density (using mixing ratio)
+            rho = mpcalc.density(th.p, temp, mix)
+
+            # next, calculate d(theta)/dp
+            th_dp = mpcalc.first_derivative(th, axis=0) / 100.; th_dp.attrs['units'] = 'K/Pa'
+            # finally, calculate N^2 in pressure coordinates
+            n2 = th_dp * -( (rho * np.square(9.81) ) / th)
+
+            # now calculate effective PV gradient (q / N^2)
+            pv_grad = (q / n2)
 
         elif inargs.data == 'era5':
             w = era5["w"].squeeze('time'); q = era5["q"].squeeze('time') * 1000.
@@ -648,9 +839,23 @@ def main(inargs):
 
             ### N768 MetUM ###
 
-            # remove unnecessary (time) dimension
-            w_gl = w_gl.squeeze('t'); u_gl = u_gl.squeeze('t'); v_gl = v_gl.squeeze('t')
-            pv_gl = pv_gl.squeeze('t') * 1000000.; q_gl = q_gl.squeeze('t'); th_gl = th_gl.squeeze('t')
+            # first file contains 2 times --> select single time 
+            if inargs.hr == 0 or inargs.hr == 12:
+                u_gl = u_gl.sel(t=dstr); v_gl = v_gl.sel(t=dstr); w_gl = w_gl.sel(t=dstr)
+                pv_gl = pv_gl.sel(t=dstr) * 1000000.
+                q_gl = q_gl.sel(t=dstr) / 1000.; q_gl.attrs['units'] = 'kg kg-1'
+                th_gl = th_gl.sel(t=dstr)
+                # interpolate PV and vertical velocity onto u,v grid 
+                pv_gl = pv_gl.interp(longitude_1=u_gl["longitude"],
+                                     latitude=u_gl["latitude"],method="linear")
+                w_gl  = w_gl.interp(longitude_1=u_gl["longitude"],
+                                    latitude=u_gl["latitude"],method="linear")
+            # remove unnecessary (time) dimension 
+            else:
+                w_gl = w_gl.squeeze('t'); u_gl = u_gl.squeeze('t'); v_gl = v_gl.squeeze('t')
+                pv_gl = pv_gl.squeeze('t') * 1000000.; q_gl.attrs['units'] = 'kg kg-1'
+                q_gl = q_gl.squeeze('t') / 1000.; q_gl.attrs['units'] = 'kg kg-1'
+                th_gl = th_gl.squeeze('t')
 
             # interpolate geostrophic wind components (from SGT tool) onto N768 grid 
             ug_gl = ug_um.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
@@ -669,14 +874,21 @@ def main(inargs):
                 th_cs = th.sel(longitude=slice(start[1],end[1]),
                                height_levels=slice(50, 13500) )
 
-            ### SGT tool ### 
+            # calculate static stability
+            # LOOK INTO THIS PART OF THE CODE (dimensions are wrong for the line below)
+            th_dz = mpcalc.first_derivative(th_gl, axis=0)#; th_dz.attrs['units'] = 'K/km'
+            th_dz = th_dz * (9.81 / th_gl)
 
+            # now calculate effective PV gradient (q / N^2)
+            pv_grad = (q_gl / th_dz) #/ 10000.
+
+            ### SGT tool ### 
             w_sg = w_sgt * 100.; u_sg = u_sgt; v_sg = v_sgt; ug_sg = ug_sgt; vg_sg = vg_sgt
 
             # interpolate to N768 grid 
             u_sg = u_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
             v_sg = v_sg.interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
-            w_sg = w_sg.interp(longitude=w_gl["longitude"],latitude=w_gl["latitude"],method="linear")
+            w_sg = w_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
             ug_sg = ug_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
             vg_sg = vg_sg.interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
 
@@ -686,6 +898,7 @@ def main(inargs):
             # relative vorticity
             vort_sg = mpcalc.vorticity(u_sg, v_sg, dx=None, dy=None) * 100000
             vort_sg.attrs['units'] = '10-5 s-1'            
+
 
             # set up vertical velocity to overlay if needed 
             if inargs.plane == 'ns':
@@ -703,34 +916,48 @@ def main(inargs):
                 v_cs = v.sel(longitude=slice(start[1],end[1]),
                              height_levels=slice(50, 13500) )
 
+
         # temporary method for choosing variable to plot 
         if inargs.var == 'w':
-            if inargs.data == '4p4':
+            if inargs.data == '4p4': # 4p4 MetUM
                 arr = omg.sel(latitude=slice(start[0],end[0]), 
                               longitude=slice(start[1],end[1]),
                               p=slice(1000.0, 150.0) ).squeeze(var_dim)
                 dl = 0.5; lmin = -15; lmax = -lmin + dl
                 Levels = np.arange(lmin, lmax, dl); Cmap='seismic'
                 cb_label = 'Vertical velocity (Pa s-1)'
-            elif inargs.data == 'era5':
+            elif inargs.data == 'era5': # ERA5
                 arr = omg.sel(latitude=slice(start[0],end[0]),
                               longitude=slice(start[1],end[1]),
                               isobaricInhPa=slice(950.0, 150.0) ).squeeze(var_dim)
                 dl = 0.5; lmin = -15; lmax = -lmin + dl
                 Levels = np.arange(lmin, lmax, dl); Cmap='seismic'
                 cb_label = 'Vertical velocity (Pa s-1)'
-            else: # N768 or SGT tool 
+            elif inargs.data == 'n768': # N768 MetUM
                 if inargs.plane == 'ns':
-                    arr = w.sel(longitude=start[1], method="nearest")
+                    arr = w_gl.sel(longitude=start[1], method="nearest")
                     arr = arr.sel(latitude=slice(start[0],end[0]),
                                   height_levels=slice(50, 13500) ) * 100.
                 else:
-                    arr = w.sel(latitude=start[0], method="nearest")
+                    arr = w_gl.sel(latitude=start[0], method="nearest")
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) ) * 100.
                 dl = 1.0; lmin = -20; lmax = -lmin + dl
                 Levels = np.arange(lmin, lmax, dl); Cmap='seismic'
                 cb_label = 'Vertical velocity (cm s-1)'
+            else: # SGT tool 
+                if inargs.plane == 'ns':
+                    arr = w_sg.sel(longitude=start[1], method="nearest")
+                    arr = arr.sel(latitude=slice(start[0],end[0]),
+                                  height_levels=slice(50, 13500) )
+                else:
+                    arr = w_sg.sel(latitude=start[0], method="nearest")
+                    arr = arr.sel(longitude=slice(start[1],end[1]),
+                                  height_levels=slice(50, 13500) )
+                dl = 1.0; lmin = -20; lmax = -lmin + dl # SCALE DIFFERENT HERE
+                Levels = np.arange(lmin, lmax, dl); Cmap='seismic'
+                cb_label = 'Vertical velocity (cm s-1)'
+
 
         # add relative vorticity for N768 (08/07/21)
         elif inargs.var == 'vort':
@@ -745,9 +972,51 @@ def main(inargs):
                                longitude=slice(start[1],end[1]),
                                isobaricInhPa=slice(950.0, 150.0) ).squeeze(var_dim)                
             dl = 6; lmin = -180; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             cb_label = 'Relative vorticity (10-5 s-1)'
 
+        # potential temperature (troubleshooting)
+        elif inargs.var == 'th':
+            if inargs.data == '4p4':
+                arr = th_dp.sel(latitude=slice(start[0],end[0]),
+                                longitude=slice(start[1],end[1]),
+                                p=slice(1000.0, 150.0) ).squeeze(var_dim)
+            elif inargs.data == 'n768':
+                if inargs.plane == 'ns':
+                    arr = th_gl.sel(longitude=start[1], method="nearest")
+                    arr = arr.sel(latitude=slice(start[0],end[0]),
+                                  height_levels=slice(50, 13500) )
+                else:
+                    arr = th_gl.sel(latitude=start[0], method="nearest")
+                    arr = arr.sel(longitude=slice(start[1],end[1]),
+                                height_levels=slice(50, 13500) )
+            #dl = 2.0; qmin = 280.0; qmax = 370.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma'
+            dl = 2.0; qmin = 280.0; qmax = 370.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma'
+            cb_label = 'Potential temperature (K)'
+
+
+        # effective PV gradient (q / N^2)
+        elif inargs.var == 'n2':
+            if inargs.data == 'n768':
+                if inargs.plane == 'ns':
+                    arr = pv_grad.sel(longitude=start[1], method="nearest")
+                    arr = arr.sel(latitude=slice(start[0],end[0]),
+                                  height_levels=slice(50, 13500) )
+                else:
+                    arr = pv_grad.sel(latitude=start[0], method="nearest")
+                    arr = arr.sel(longitude=slice(start[1],end[1]),
+                                  height_levels=slice(50, 13500) )
+                    dl = 5.0; qmin = 0.0; qmax = 100.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
+                    cb_label=r'$q/N^2\,(s^{-2})$'
+            elif inargs.data == '4p4':
+                arr = pv_grad.sel(latitude=slice(start[0],end[0]),
+                                  longitude=slice(start[1],end[1]),
+                                  p=slice(1000.0, 150.0) ).squeeze(var_dim)
+                dl = 5.0; qmin = 0.0; qmax = 100.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
+                cb_label=r'$q/N^2\,(s^{-2})$'
+
+            
+        # specific humidity 
         elif inargs.var == 'q':
             if inargs.data == '4p4':
                 arr = q.sel(latitude=slice(start[0],end[0]),
@@ -777,6 +1046,7 @@ def main(inargs):
                                   height_levels=slice(50, 13500) )
             dl = 1.0; qmin = 1.0; qmax = 18.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='BuPu'
             cb_label = 'Specific humidity (kg kg-1)'
+
 
         # add relative humidity for N768 (08/07/21)
         elif inargs.var == 'rh':
@@ -820,7 +1090,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                 height_levels=slice(50, 13500) )
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
             cb_label = 'Zonal wind (m s-1)'
             
 
@@ -852,8 +1122,8 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
-            cb_label = 'Meridional wind (m s-1)'
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
+            cb_label=r'Meridional wind $\mathregular{(m\,s^{-1})}$'
 
 
         elif inargs.var == 'ua':
@@ -867,7 +1137,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
                 dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
                 cb_label = 'u_ageo (m s-1)'
             elif inargs.data == 'n768':
                 if inargs.plane == 'ns':
@@ -879,7 +1149,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
                 dl = 1.0; vmin = -30.0; vmax = -vmin + dl
-                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
                 cb_label = 'u_ageo (m s-1)'            
 
 
@@ -894,7 +1164,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
                 dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
                 cb_label = 'u_ageo (m s-1)'
             elif inargs.data == 'n768':
                 if inargs.plane == 'ns':
@@ -906,7 +1176,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
                 dl = 1.0; vmin = -30.0; vmax = -vmin + dl
-                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+                Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
                 cb_label = 'u_ageo (m s-1)'
 
 
@@ -930,7 +1200,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
             cb_label = 'u_geo (m s-1)'
 
 
@@ -954,7 +1224,7 @@ def main(inargs):
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
             cb_label = 'v_geo (m s-1)'
 
 
@@ -978,12 +1248,22 @@ def main(inargs):
                     arr = pv_gl.sel(latitude=start[0], method="nearest")
                     arr = arr.sel(longitude=slice(start[1],end[1]),
                                   height_levels=slice(50, 13500) )
+
+            dl = 0.2; vmin = -2.4; vmax = -vmin + dl
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'PuOr_r')
+            cb_label = 'Potential vorticity (PVU)'
+
+            #Levels = (-2.0, -1.5, -1.0, -0.5, -0.4, -0.3, -0.2, -0.1,
+            #          0.0, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0)
+            #Cmap = 'PuOr'
+            #cb_label = 'Potential vorticity (PVU)' 
+            """
             Levels = (0.0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 
                       1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0)
             Cmap = matplotlib.colors.ListedColormap(matplotlib.cm.get_cmap("magma_r").colors[:250])
             Cmap.set_under('white')
             cb_label = 'Potential vorticity (PVU)'
-
+            """
 
         # interpolate to new levels straight before plotting (troubleshooting)
         ht_coords = np.arange(0, 13500, 250)
@@ -1009,7 +1289,7 @@ def main(inargs):
         elif inargs.data == 'n768':
             dstr = arr.t.dt.strftime("%Y%m%dT%H").values
         else: # SGT tool
-            dstr = u_gl.t.dt.strftime("%Y%m%dT%H").values[0]
+            dstr = u_gl.t.dt.strftime("%Y%m%dT%H").values#[0]
 
         # set up plot 
         fig = plt.figure(figsize=[9,6])
@@ -1040,23 +1320,31 @@ def main(inargs):
                 if inargs.data == 'n768' or inargs.data == 'sgt':
                     w_cs = w_cs.interp(longitude=lon_dim, method="linear")
                     v_cs = v_cs.interp(longitude=lon_dim, method="linear")
-                        
+
+        # plot filled contours
         var_contour = plt.contourf(arr, levels=Levels, extend='max', cmap=Cmap)
+
+        # overlay line contours 
         if inargs.cs == 'th':
-            th_contour = plt.contour(th_cs, levels=np.arange(200, 500, 2), colors=['black'])
+            if inargs.data == '4p4':
+                th_contour = plt.contour(th_cs, levels=np.arange(200, 500, 4), colors=['black'])
+            else:
+                th_contour = plt.contour(th_cs, levels=np.arange(200, 500, 2), colors=['black'])
         elif inargs.cs == 'w':
-            w_contour = plt.contour(w_cs, levels=np.arange(1, 10, 1), colors=['deepskyblue'])
+            w_contour = plt.contour(w_cs, levels=np.arange(-10, 10, 4), colors=['deepskyblue'])
         elif inargs.cs == 'v':
             v_contour = plt.contour(v_cs, levels=np.arange(4, 20, 2), colors=['deepskyblue'])
-        else: # 'vw'
+        elif inargs.cs == 'vw':
             w_contour = plt.contour(w_cs, levels=np.arange(1, 10, 1), colors=['deepskyblue'])
             v_contour = plt.contour(v_cs, levels=np.arange(5, 10, 5), 
                                     colors=['slategray'], linestyles='dashed')
+        else:
+            print('no additional contours overlaid on x-z plot')
         var_cbar = fig.colorbar(var_contour)
 
         # tickmarks and labels
         ax.grid(True)
-        xint = 1; yint = 2
+        xint = 1; yint = 4
         if inargs.plane == 'ns':
             ts = np.rint(arr.latitude[0].data); tf = np.rint(arr.latitude[-1].data)
             dim_size = len(arr.latitude); ax.set_xlabel('Latitude (degrees north)')
@@ -1067,9 +1355,9 @@ def main(inargs):
         # x-axis tickmarks every 2º 
         ax.set_xlim(0, dim_size-1)
         if inargs.data == '4p4': # or inargs.data == 'n768' or inargs.data == 'sgt':
-            ax.set_xticks(np.arange(0, dim_size+1, 50) )
+            ax.set_xticks(np.arange(0, dim_size+1, 100) )
         else: # ERA5, N768, SGT --> elif inargs.data == 'era5':
-            ax.set_xticks(np.arange(0, dim_size+1, 8) )
+            ax.set_xticks(np.arange(0, dim_size+1, 16) )
         ax.set_xticklabels(np.arange(ts, tf+1, yint) )
 
         # y-axis tickmarks and labels 

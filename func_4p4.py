@@ -21,7 +21,7 @@ from matplotlib.patches import Rectangle
 from custom_cmap import *
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 # set the colormap and centre the colorbar                                             
 class MidpointNormalize(colors.Normalize):
@@ -336,7 +336,7 @@ def plot_pv(pv, u, v, dataset, plev=800, mlev=1.810000e+03, bv_centre=True):
       bv_centre (bool): overlay BV centre from Kevin Hodges' algorithm  
     """
 
-    # set up plots and axes                                                                        
+    # set up plots and axes
     fig = plt.figure(figsize=[9,6])
     ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))
 
@@ -351,7 +351,7 @@ def plot_pv(pv, u, v, dataset, plev=800, mlev=1.810000e+03, bv_centre=True):
                          cbar_kwargs={'label': 'PVU'},
                          cmap='PuOr')
 
-    # add coastlines, gridlines and tickmarks                                                      
+    # add coastlines, gridlines and tickmarks
     ax.add_feature(cfeature.COASTLINE.with_scale('50m'),linewidth=0.75)
     xint = 5; yint = 3
     n0 = np.rint(u.longitude[0].data); n1 = np.rint(u.longitude[-1].data)
@@ -375,6 +375,69 @@ def plot_pv(pv, u, v, dataset, plev=800, mlev=1.810000e+03, bv_centre=True):
     return fig 
 
 
+def plot_n2(pv_grad, u, v, bv_centre, dataset, plev=800, mlev=1.810000e+03):
+    """                                                                                         
+    produce an x-y plot of potential vorticity                                                  
+                                                                                                
+    Args:                                                                                       
+      pv_grad (xarray DataArray): multi-dimensional data array                                       
+      dataset (str): dataset to analyse (e.g. 4p4, N768, ERA5)                                  
+                                                                                                
+    Kwargs:                                                                                     
+      plev (int): pressure level for calculation (4p4)                                          
+      mlev (int): model level for calculation (N768)                                            
+      bv_centre (bool): overlay BV centre from Kevin Hodges' algorithm                          
+    """
+
+    # vortex track information between 12Z on 21st and 26th October 2018 
+    bv_lat = bv_centre.loc[0:20, "lat_vort"]; bv_lon = bv_centre.loc[0:20, "lon_vort"]
+    bv_time = bv_centre.loc[0:20, "Time"]
+
+    # find index of vortex centre information that matches the chosen time
+    if dataset == '4p4':
+        filter = bv_time==pv_grad.coords['t'].data
+    time_match = bv_time.where(filter).notna()
+    ind = int(time_match.loc[time_match==True].index.values)
+
+    # set up plots and axes                                                                     
+    fig = plt.figure(figsize=[9,6])
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))
+
+    # plot data                                                                                 
+    if dataset == '4p4' or dataset == 'era5':
+        #Levels = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+        dl = 5.0; qmin = 0.0; qmax = 100.0; Levels = np.arange(qmin,qmax+dl,dl)
+        pv_grad.attrs['units'] = 'q/N^2'
+        pv_grad.plot.contourf(ax=ax, extend='max', levels=Levels, transform=ccrs.PlateCarree(),
+                              cbar_kwargs={'label': r'$q/N^2\,(s^{-2})$'},
+                         cmap='plasma_r')
+
+    # add coastlines, gridlines and tickmarks                                                    
+    ax.add_feature(cfeature.COASTLINE.with_scale('50m'),linewidth=0.75)
+    xint = 5; yint = 3
+    n0 = np.rint(pv_grad.longitude[0].data); n1 = np.rint(pv_grad.longitude[-1].data)
+    t0 = np.rint(pv_grad.latitude[0].data); t1 = np.rint(pv_grad.latitude[-1].data)
+    ax.set_xticks(np.arange(n0, n1+xint, xint))
+    ax.set_xticklabels(np.arange(n0, n1+xint, xint))
+    ax.set_yticks(np.arange(t0, t1+yint, yint))
+    ax.set_yticklabels(np.arange(t0, t1+yint, yint))
+    plt.gca().gridlines(color='grey', linestyle='--', linewidth=0.5)
+
+    # add horizontal wind barbs                                                                  
+    if dataset == '4p4':
+        skip = 24
+    elif dataset == 'era5':
+        skip = 4
+    else:
+        skip = 1
+    ax.quiver(u.longitude.values[::skip], u.latitude.values[::skip],
+              u.values[::skip, ::skip], v.values[::skip, ::skip], angles='xy', scale=400)
+
+    # overlay vortex centre position (Kevin Hodges' tracking algorithm)
+    ax.plot(bv_lon[ind], bv_lat[ind], marker='*', color='c', markersize=12)
+
+    return fig
+
 def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay=''):
     """
     produce a simple x-y plot given a dataset (e.g. ERA5) and a variable (e.g. vorticity)
@@ -385,8 +448,8 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
       bv_centre (Pandas DataFrame): Borneo vortex tracking information
       var (str): variable to plot (e.g. vorticity, geopotential height)
     Kwargs:
-      plev (int): pressure level for calculation (4p4)
-      mlev (int): model level for calculation (N768)
+      plev (int): pressure level for calculation (4p4) --> NOT CURRENTLY ACTIVE
+      mlev (int): model level for calculation (N768) --> NOT CURRENTLY ACTIVE 
       bv_centre (bool): overlay BV centre from Kevin Hodges' algorithm 
       wind (str): plot full, geostrophic or ageostrophic wind (default=full)
       overlay (str): overlay line contours of additional diagnostic (e.g. w,u,v)
@@ -399,7 +462,7 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
     # find index of vortex centre information that matches the chosen time
     if dataset == '4p4':
         filter = bv_time==data.coords['t'].data
-    elif dataset == 'n768':
+    elif dataset == 'n768' or dataset == 'sgt':
         filter = bv_time==data[0].coords['t'].data
     elif dataset == 'era5':
         filter = bv_time==data.coords['time'].data[0]
@@ -468,10 +531,28 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
         vort_gl = mpcalc.vorticity(u_gl, v_gl, dx=None, dy=None) * 100000
         vort_gl.attrs['units'] = '10-5 s-1'
 
+    """
     # smooth fields before plotting 
     pv_gl = mpcalc.smooth_gaussian(pv_gl, 4); pv_gl.attrs['units'] = 'PVU'
     v_gl  = mpcalc.smooth_gaussian(v_gl, 64); v_gl.attrs['units'] = 'm/s'
     u_gl  = mpcalc.smooth_gaussian(u_gl, 64); u_gl.attrs['units'] = 'm/s'
+    """
+
+    # effective PV gradient (q/N^2)
+    if dataset == '4p4':
+
+        # first, calculate mixing ratio                                                     
+        mix = mpcalc.mixing_ratio_from_specific_humidity(q)
+        # then, calculate density (using mixing ratio)                                      
+        rho = mpcalc.density(th.p, temp, mix)
+
+        # next, calculate d(theta)/dp                                                       
+        th_dp = mpcalc.first_derivative(th, axis=0) / 100.; th_dp.attrs['units'] = 'K/Pa'
+        # finally, calculate N^2 in pressure coordinates                                    
+        n2 = th_dp * -( (rho * np.square(9.81) ) / th)
+
+        # now calculate effective PV gradient (q / N^2)                                     
+        pv_grad = (q / n2) / 10000.
 
     # set up plots and axes
     fig = plt.figure(figsize=[9,6])
@@ -491,19 +572,19 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
                               cmap=cmocean.cm.haline_r)
         elif var == 'v':
             dl = 2.0; lmin = -20; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             v.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                             cbar_kwargs={'label': v.units},
                             cmap=Cmap)            
         elif var == 'u':
             dl = 2.0; lmin = -20; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             u.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                             cbar_kwargs={'label': u.units},
                             cmap=Cmap)
         elif var == 'vort':
             dl = 2; lmin = -80; lmax = -lmin + dl
-            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             vort.plot.contourf(ax=ax, levels=Levels, transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': vort.units},
                                cmap='seismic')
@@ -543,55 +624,55 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
                               cmap=cmocean.cm.haline_r)
         elif var == 'u':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             u.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
-                            cbar_kwargs={'label': u.units},
+                            cbar_kwargs={'label': r'Zonal wind $\mathrm{(m\,s^{-1})}$'},
                             cmap=Cmap)
         elif var == 'v':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             v.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
-                            cbar_kwargs={'label': v.units},
+                            cbar_kwargs={'label': r'Meridional wind $\mathrm{(m\,s^{-1})}$'},
                             cmap=Cmap)
         elif var == 'ua':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ua.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': u.units},
                              cmap=Cmap)
         elif var == 'va':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             va.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': v.units},
                              cmap=Cmap)
         elif var == 'ug':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ug.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': u.units},
                              cmap=Cmap)
         elif var == 'vg':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             vg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': v.units},
                              cmap=Cmap)
         elif var == 'vort':
             dl = 2; lmin = -80; lmax = -lmin + dl
-            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl, 'bwr')
             vort.plot.contourf(ax=ax, levels=Levels, transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': vort.units},
                                cmap='seismic')
         elif var == 'omg':
             dl = 0.5; lmin = -10; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl)
+            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl, 'bwr')
             omg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                               cbar_kwargs={'label': omg.units},
                               cmap=Cmap)
         elif var == 'w':
             dl = 0.5; lmin = -10; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl)
+            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl, 'bwr')
             w.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                             cbar_kwargs={'label': 'cm/s'},
                             cmap=Cmap)
@@ -624,6 +705,12 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
             pv.plot.contourf(ax=ax, extend='max', levels=Levels, transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': 'PVU'},
                              cmap=Cmap)            
+        elif var == 'n2':
+            Levels = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+            Cmap = 'plasma_r'
+            pv_grad.plot.contourf(ax=ax, extend='max', levels=Levels, transform=ccrs.PlateCarree(),
+                                  cbar_kwargs={'label': 'q/N^2'},
+                                  cmap=Cmap)
             
     elif dataset == 'n768':
 
@@ -634,49 +721,49 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
                               cmap=cmocean.cm.haline_r)
         elif var == 'u':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             u_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': u_gl.units},
                                cmap=Cmap)
         elif var == 'v':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             v_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': v_gl.units},
                                cmap=Cmap)
         elif var == 'ua':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ua_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': u_gl.units},
                                 cmap=Cmap)
         elif var == 'va':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             va_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': v_gl.units},
                                 cmap=Cmap)
         elif var == 'ug':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ug_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': u_gl.units},
                                 cmap=Cmap)
         elif var == 'vg':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             vg_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': v_gl.units},
                                 cmap=Cmap)
         elif var == 'vort':
             dl = 2; lmin = -80; lmax = -lmin + dl
-            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             vort_gl.plot.contourf(ax=ax, levels=Levels, transform=ccrs.PlateCarree(),
                                   cbar_kwargs={'label': vort_gl.units},
                                   cmap='seismic')
         elif var == 'w':
             dl = 0.5; lmin = -10; lmax = -lmin + dl
-            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl)
+            Cmap,norm,Levels = normalise_cmap(lmin, lmax, 0, dl, 'bwr')
             w_gl.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': 'cm/s'},
                                cmap=Cmap)
@@ -691,11 +778,23 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
                                cmap=Cmap)
         elif var == 'pv':
             pv = pv_gl * 1000000.
+
+            tstr = str(pv.coords['t'].data)
+            # T+0 and T+12
+            if tstr == '2018-10-22T00:00:00.000000000' or tstr == '2018-10-21T12:00:00.000000000':
+                pv = pv.interp(longitude_1=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
+            # all other times (T+24 onwards)
+            else:
+                pv = pv.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
+
             """
             Levels = (0.0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8,
                       1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0)
             Cmap = matplotlib.colors.ListedColormap(matplotlib.cm.get_cmap("magma_r").colors[:250])
             Cmap.set_under('white')
+            """
+            dl = 0.2; vmin = -2.4; vmax = -vmin + dl
+            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'PuOr_r')
             pv.plot.contourf(ax=ax, extend='max', levels=Levels, transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': 'PVU'},
                              cmap=Cmap)
@@ -708,6 +807,7 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
             pv.plot.contourf(ax=ax, extend='max', levels=Levels, transform=ccrs.PlateCarree(),
                              cbar_kwargs={'label': 'PVU'},
                              cmap='PuOr')
+            """
 
     else: # SGT tool 
         if var == 'spd':
@@ -717,49 +817,49 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
                               cmap=cmocean.cm.haline_r)
         elif var == 'vort':
             dl = 2; lmin = -80; lmax = -lmin + dl
-            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl)
+            Cmap, norm, Levels = normalise_cmap(lmin,lmax,0,dl,'bwr')
             vort_sg.plot.contourf(ax=ax, levels=Levels, transform=ccrs.PlateCarree(),
                                   cbar_kwargs={'label': vort_sg.units},
                                   cmap='seismic')
         elif var == 'w':
             dl = 0.5; lmin = -10; lmax = -lmin + dl
-            Cmap, norm, Levels = normalise_cmap(lmin, lmax, 0, dl)
+            Cmap, norm, Levels = normalise_cmap(lmin, lmax, 0, dl, 'bwr')
             w_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': 'cm/s'},
                                cmap=Cmap)
         elif var == 'u':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             u_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': u_sg.units},
                                cmap=Cmap)
         elif var == 'v':
             dl = 1.0; vmin = -25.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             v_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                cbar_kwargs={'label': v_sg.units},
                                cmap=Cmap)
         elif var == 'ua':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ua_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': u_sg.units},
                                 cmap=Cmap)
         elif var == 'va':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             va_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': v_sg.units},
                                 cmap=Cmap)
         elif var == 'ug':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             ug_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': u_sg.units},
                                 cmap=Cmap)
         elif var == 'vg':
             dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl)
+            Cmap,norm,Levels = normalise_cmap(vmin,vmax,0,dl,'bwr')
             vg_sg.plot.contourf(ax=ax, levels=Levels, extend='max', transform=ccrs.PlateCarree(),
                                 cbar_kwargs={'label': v_sg.units},
                                 cmap=Cmap)
@@ -774,7 +874,7 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
             v_sg.plot.contour(ax=ax, levels=np.arange(4, 20, 2), 
                               transform=ccrs.PlateCarree(), colors=['slategray'])
         elif overlay == 'w':
-            w_sg.plot.contour(ax=ax, levels=np.arange(1, 10, 1),
+            w_sg.plot.contour(ax=ax, levels=np.arange(-10, 10, 4),
                               transform=ccrs.PlateCarree(), colors=['deepskyblue'])
         elif overlay == 'vw':
             v_sg.plot.contour(ax=ax, levels=np.arange(4, 20, 2),
@@ -789,11 +889,11 @@ def plot_xy(data, dataset, var, bv_centre, plev=800, mlev=1500, wind='', overlay
     ax.add_feature(cfeature.COASTLINE.with_scale('50m'),linewidth=0.75)
     xint = 5; yint = 3
     if dataset == 'n768':
-        n0 = np.rint(u_gl.longitude[0].data); n1 = np.rint(u_gl.longitude[-1].data)
-        t0 = np.rint(u_gl.latitude[0].data); t1 = np.rint(u_gl.latitude[-1].data)
+        n0 = np.rint(u_gl.longitude[0].data)+1; n1 = np.rint(u_gl.longitude[-1].data)-1
+        t0 = np.rint(u_gl.latitude[0].data)+1; t1 = np.rint(u_gl.latitude[-1].data)-1
     elif dataset == 'sgt':
-        n0 = np.rint(u_sg.longitude[0].data); n1 = np.rint(u_sg.longitude[-1].data)
-        t0 = np.rint(u_sg.latitude[0].data); t1 = np.rint(u_sg.latitude[-1].data)
+        n0 = np.rint(u_sg.longitude[0].data)+1; n1 = np.rint(u_sg.longitude[-1].data)-1
+        t0 = np.rint(u_sg.latitude[0].data)+1; t1 = np.rint(u_sg.latitude[-1].data)-1
     else: # 4p4 or ERA5
         n0 = np.rint(u.longitude[0].data); n1 = np.rint(u.longitude[-1].data)
         t0 = np.rint(u.latitude[0].data); t1 = np.rint(u.latitude[-1].data)        

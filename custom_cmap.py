@@ -28,11 +28,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.ticker
 
-def normalise_cmap(vmin, vmax, midpoint, dl):
-    levels=np.arange(vmin,vmax,dl)
+def normalise_cmap(vmin, vmax, midpoint, dl, cmap_str):
+    levels = np.arange(vmin,vmax,dl)
     midp = np.mean(np.c_[levels[:-1], levels[1:]], axis=1)
     vals = np.interp(midp, [vmin, midpoint, vmax], [0, 0.5, 1])
-    colors = plt.cm.bwr(vals)
+    colors = plt.cm.get_cmap(cmap_str); colors = colors(vals)
     cmap, norm = from_levels_and_colors(levels, colors)
     return cmap, norm, levels
 
