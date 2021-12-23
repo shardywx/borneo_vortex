@@ -202,7 +202,7 @@ def main(inargs):
         fig.savefig(fili,dpi=200)
         exit()
 
-    # FUNCTION 7 --> 
+    # FUNCTION 7 --> calculate and plot vbar, ubar or circ 
 
     # read in N768 data using xarray
     if inargs.var == 'circ' or inargs.var == 'ubar' or inargs.var == 'node':
@@ -338,6 +338,8 @@ def main(inargs):
             fig.savefig(fili,dpi=200)
             exit()
 
+    # FUNCTION 8 --> general reading in of data 
+
     # if not calculating area-averaged vorticity or zonally-averaged zonal wind 
     else:
 
@@ -391,11 +393,10 @@ def main(inargs):
                                   longitude_1=slice(nn[0], nn[1]), latitude_1=slice(nn[2], nn[3]) )
             gdata_pb=data_pb.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]) )
 
-    # interpolate all data onto 4p4 grid 
+    # FUNCTION 9 --> interpolate N768 MetUM and SGT tool data onto specified levels
 
     # N768 onto 4p4 
     if inargs.data == 'n768' or inargs.data == 'sgt':
-
 
         # create new array of height levels 
         ht_coords = np.arange(0, 17500, 250)
@@ -495,6 +496,8 @@ def main(inargs):
         ug_sgt.attrs['units'] = 'm/s'; vg_sgt.attrs['units'] = 'm/s'
         ug_um.attrs['units'] = 'm/s'; vg_um.attrs['units'] = 'm/s'
 
+    
+
     # ERA5 onto 4p4 (not for now)
     if inargs.data == 'era5':
         u_era = era5.u; v_era = era5.v; w_era = era5.w
@@ -502,9 +505,11 @@ def main(inargs):
         z_era = era5.z; pv_era = era5.pv; temp_era = era5.t
 
 
-    ### either produce x-y or x-z plot ###
+    # SECTION (multiple functions) --> x-y plots
 
     if inargs.plot_type == 'xy': # horizontal cross-section ('xy')
+
+        # FUNCTION 10 --> set up 4p4 data for x-y plot
 
         # focus on single pressure level and remove 1D time dimension
         if inargs.data == '4p4':
@@ -557,6 +562,9 @@ def main(inargs):
                 data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
                                              data_pd.squeeze(['t', 't_1'])])
                 data = data.sel(p=int(inargs.plev) )
+
+        # FUNCTION 11 --> set up ERA5 data for x-y plot
+
         elif inargs.data == 'era5':
             if inargs.var == 'pv':
                 # read in data, as above for 4p4 MetUM
@@ -572,7 +580,9 @@ def main(inargs):
                 u=u.sel(isobaricInhPa=int(inargs.plev)); v=v.sel(isobaricInhPa=int(inargs.plev))
             else:
                 data = era5.sel(isobaricInhPa=int(inargs.plev) )
-                
+
+        # FUNCTION 12 --> set up N768/SGT tool data for x-y plot 
+ 
         else: # N768 or SGT tool 
 
             # N768 MetUM 
@@ -622,6 +632,8 @@ def main(inargs):
         ax.plot(bv_lon[ind], bv_lat[ind], 'cD--', markersize=7)
         """
 
+        # FUNCTION 13 --> produce x-y plot, and save 
+
         # call the plotting function, and save the file 
         if inargs.var == 'pv' and inargs.data != 'n768':
             fig = fp.plot_pv(pv, u, v, df, inargs.data)
@@ -647,13 +659,16 @@ def main(inargs):
 
         print('output file created. moving onto next one...')
 
-    # vertical cross section (inargs.plot_type == 'xz')
+    # SECTION (multiple functions) --> xz plots (inargs.plot_type == 'xz')
+
     else:
 
         """
         Tidy this part of the script up, and incorporate into external function 
         #fig = fp.plot_xz(data, inargs.data, inargs.var, inargs.plane)
         """
+
+        # FUNCTION 14 --> set xz plot limits 
 
         if int(inargs.hr) == 0:
             if inargs.plane == 'ns':
@@ -791,6 +806,8 @@ def main(inargs):
             # avoid blank edges on x-z plot (troubleshooting)
             start[1] = start[1]- 0.5; end[1] = end[1] + 0.5
 
+        # FUNCTION 15 --> set up 4p4 data for xz plot 
+
         # remove unused dimensions --> script won't run if you choose --cs='w' and --data='4p4'
         if inargs.data == '4p4':
             data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
@@ -827,6 +844,8 @@ def main(inargs):
             # now calculate effective PV gradient (q / N^2)
             pv_grad = (q / n2)
 
+        # FUNCTION 16 --> set up ERA5 data for xz plot 
+
         elif inargs.data == 'era5':
             w = era5["w"].squeeze('time'); q = era5["q"].squeeze('time') * 1000.
             z = era5["z"].squeeze('time'); u = era5["u"].squeeze('time')
@@ -839,6 +858,8 @@ def main(inargs):
             th_cs = th.sel(latitude=slice(start[0],end[0]),
                            longitude=slice(start[1],end[1]),
                            isobaricInhPa=slice(950.0, 150.0) ).squeeze(var_dim)
+
+        # FUNCTION 17 --> set up N768 and SGT tool data for xz plot 
 
         else: # N768 or SGT tool
 
@@ -921,6 +942,7 @@ def main(inargs):
                 v_cs = v.sel(longitude=slice(start[1],end[1]),
                              height_levels=slice(50, 13500) )
 
+        # FUNCTION 18 --> produce xz plot using chosen dataset and variable 
 
         # temporary method for choosing variable to plot 
         if inargs.var == 'w':
@@ -1270,6 +1292,8 @@ def main(inargs):
             cb_label = 'Potential vorticity (PVU)'
             """
 
+        # FUNCTION 19 --> interpolate to new levels before plotting 
+
         # interpolate to new levels straight before plotting (troubleshooting)
         ht_coords = np.arange(0, 13500, 250)
         prs_coords = np.arange(1000, 100, -50)
@@ -1283,6 +1307,8 @@ def main(inargs):
             arr = arr.interp(p=prs_coords,method="linear")
             th_cs = th_cs.interp(p=prs_coords,method="linear")
 
+        # FUNCTION 20 --> create date string for plot title 
+
         # date string 
         if inargs.data == '4p4':
             if inargs.var == 'u' or inargs.var == 'v' or inargs.var == 'vort':
@@ -1295,6 +1321,10 @@ def main(inargs):
             dstr = arr.t.dt.strftime("%Y%m%dT%H").values
         else: # SGT tool
             dstr = u_gl.t.dt.strftime("%Y%m%dT%H").values#[0]
+
+        # Plotting SECTION (multiple smaller functions)
+
+        # FUNCTION 21 --> initialise plot object and produce filled contours 
 
         # set up plot 
         fig = plt.figure(figsize=[9,6])
@@ -1329,6 +1359,8 @@ def main(inargs):
         # plot filled contours
         var_contour = plt.contourf(arr, levels=Levels, extend='max', cmap=Cmap)
 
+        # FUNCTION 22 --> overlay line contours onto filled contours 
+
         # overlay line contours 
         if inargs.cs == 'th':
             if inargs.data == '4p4':
@@ -1346,6 +1378,8 @@ def main(inargs):
         else:
             print('no additional contours overlaid on x-z plot')
         var_cbar = fig.colorbar(var_contour)
+
+        # FUNCTION 23 --> overlay axis tickmarks and labels 
 
         # tickmarks and labels
         ax.grid(True)
