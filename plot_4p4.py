@@ -30,7 +30,7 @@ def main(inargs):
     produce simple plots using 4.4 km MetUM data 
     """
 
-    # read in 4.4 km MetUM data (xarray)
+    # FUNCTION 1 --> read in 4.4 km MetUM data (xarray)
     if inargs.data == '4p4':
         sstr, dstr, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype=inargs.data)
     elif inargs.var == 'circ':
@@ -38,7 +38,7 @@ def main(inargs):
     else:
         sstr, dstr, tstr = fp.open_file(inargs.input_file, inargs.hr)
 
-    # read in ERA5 reanalysis data (xarray)
+    # FUNCTION 2 (?) --> read in ERA5 reanalysis data (xarray)
     if inargs.data == 'era5':
         if inargs.hr < 0:
             era_file = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
@@ -46,22 +46,7 @@ def main(inargs):
             era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
         era5 = xr.open_dataset(era_file, engine="cfgrib").metpy.parse_cf()
 
-    # subset the data     
-    if inargs.plot_type == 'xz':
-        nn = [87.0, 135.0, -3.0, 20.0]
-        #nn = [88.0, 130.0, -6.0, 23.0]
-        """
-        if inargs.hr < 12:
-            nn = [98.0, 133.0, -3.0, 20.0]
-        elif inargs.hr > 96: 
-            nn = [88.0, 123.0, -3.0, 20.0]
-        else:
-            nn = [93.0, 123.0, -3.0, 20.0]
-        """
-    else:
-        nn = [88.0, 130.0, -6.0, 23.0]
-        #nn = [98.0, 133.0, -3.0, 20.0]
-        #nn = [93.0, 130.0, -3.0, 21.0] / nn = [88.0, 125.0, -3.0, 21.0]
+    # FUNCTION 3 --> read in BV track data and extract track information 
 
     # read in Kevin Hodges' Borneo vortex track data from text file
     df = pd.read_csv('/nobackup/earshar/borneo/bv_2018102112_track.csv',
@@ -86,7 +71,24 @@ def main(inargs):
     ax.plot(bv_lon[ind], bv_lat[ind], 'cD--', markersize=7)                                  
     """
 
-    # read in Himawari data                                                                  
+    # FUNCTION 4 --> subset the data
+    if inargs.plot_type == 'xz':
+        nn = [87.0, 135.0, -3.0, 20.0]
+        #nn = [88.0, 130.0, -6.0, 23.0]
+        """
+        if inargs.hr < 12:
+            nn = [98.0, 133.0, -3.0, 20.0]
+        elif inargs.hr > 96:
+            nn = [88.0, 123.0, -3.0, 20.0]
+        else:
+            nn = [93.0, 123.0, -3.0, 20.0]
+        """
+    else:
+        nn = [88.0, 130.0, -6.0, 23.0]
+        #nn = [98.0, 133.0, -3.0, 20.0]
+        #nn = [93.0, 130.0, -3.0, 21.0] / nn = [88.0, 125.0, -3.0, 21.0]
+
+    # FUNCTION 5 --> read in Himawari data                                                                  
     if inargs.var == 'hima':
         hstr = dstr.strftime("%Y%m%d_%H00") # create string to read in data from single file 
         hima_nc = '/nobackup/earshar/borneo/himawari/himawari_10.4_{0}.4p4km.nc'.format(hstr)
@@ -130,6 +132,7 @@ def main(inargs):
         plt.savefig(fili,dpi=200)
         exit()
 
+    # FUNCTION 6 --> read in precip data and produce time-serires plot 
 
     # only read in precipitation data if we're producing time series 
     if inargs.var == 'prcp':
@@ -198,6 +201,8 @@ def main(inargs):
         ax.grid(True); ax.legend(loc='upper left')
         fig.savefig(fili,dpi=200)
         exit()
+
+    # FUNCTION 7 --> 
 
     # read in N768 data using xarray
     if inargs.var == 'circ' or inargs.var == 'ubar' or inargs.var == 'node':
