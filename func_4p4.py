@@ -137,7 +137,7 @@ def subset(data, bounds, var='', vtime=[]):
 
     return data
 
-def acc_prcp(prcp, dataset, bv_lat, bv_lon, r0=3.0, plt_prcp=True):
+def calc_area_ave_acc_prcp(prcp, dataset, bv_lat, bv_lon, r0=3.0, plt_prcp=True):
     """
     calculate area-averaged, accumulated precipitation following a storm, within a specified radius 
 
