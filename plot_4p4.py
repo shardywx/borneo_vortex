@@ -38,7 +38,7 @@ def main(inargs):
     else:
         sstr, date_str, tstr = fp.open_file(inargs.input_file, inargs.hr)
 
-    # FUNCTION 2 (?) --> read in ERA5 reanalysis data (xarray)
+    # FUNCTION 2 --> read in ERA5 reanalysis data (xarray)
     if inargs.data == 'era5':
         if inargs.hr < 0:
             ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
