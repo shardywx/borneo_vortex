@@ -41,10 +41,10 @@ def main(inargs):
     # FUNCTION 2 (?) --> read in ERA5 reanalysis data (xarray)
     if inargs.data == 'era5':
         if inargs.hr < 0:
-            era_file = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
+            ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
         else:
-            era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
-        era5 = xr.open_dataset(era_file, engine="cfgrib").metpy.parse_cf()
+            ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018.grib'
+        era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
 
     # FUNCTION 3 --> read in BV track data and extract track information
     VORTEX_PATH = '/nobackup/earshar/borneo/bv_2018102112_track.csv'
@@ -55,82 +55,15 @@ def main(inargs):
     bounds = define_plot_bounds(inargs.plot_type)
 
 
-    # FUNCTION 5 --> read in Himawari data
+    # FUNCTION 5 --> plot Himawari brightness temperature data
     if inargs.var == 'hima':
         himawari_plot = plot_t_bright_himawari(date_str, bounds, VORTEX_PATH)
+    # FUNCTION 6 --> produce time-series plot of accumulated precipitation
+    elif inargs.var == 'prcp':
+        prcp_time_series_plot = plot_prcp_time_series(bounds, VORTEX_PATH, inargs.r0)
 
 
-    # FUNCTION 6 --> read in precip data and produce time-serires plot 
-
-    # only read in precipitation data if we're producing time series 
-    if inargs.var == 'prcp':
-        # 4.4 km MetUM data (Iris) --> 1 h output interval
-        pfili  = '/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld_pverb.pp'
-        pcubes = iris.load(pfili)
-        prcp_4p4 = xr.DataArray.from_iris(pcubes.extract('stratiform_rainfall_flux')[1])
-        prcp_4p4 = prcp_4p4.sel(longitude=slice(nn[0],nn[1]),latitude=slice(nn[2],nn[3]) )
-
-        # GPM data (xarray) --> 30 min output interval 
-        gpm_file = '/nobackup/earshar/borneo/GPMHH_201810.nc'
-        gpm = xr.open_dataset(gpm_file).sel(lon=slice(nn[0],nn[1]),lat=slice(nn[2],nn[3]) )
-        prcp_gpm = gpm.precipitationCal
-
-        # N768 MetUM data (xarray) --> 12 h output interval
-        Tp = [24, 36, 48, 60, 72, 84, 96, 108, 120]
-        # set up array to hold data at all output intervals 
-        xr_dims = [len(Tp), prcp_4p4.latitude.shape[0], prcp_4p4.longitude.shape[0]]
-        # retrieve time coordinate information from GPM data 
-        time_co = prcp_gpm.resample(time="12H").sum().sel(time = slice('2018-10-22T12',
-                                                                       '2018-10-26T12') )
-
-        # initialise array 
-        prcp_gl = xr.DataArray(np.ones(xr_dims),
-                               dims=["time", "latitude", "longitude"],
-                               coords={
-                                   "time": time_co.time, 
-                                   "latitude": prcp_4p4.latitude, 
-                                   "longitude": prcp_4p4.longitude, 
-                                   },
-                           )
-
-        # read in data for all output intervals 
-        for i, t in enumerate(Tp):
-            nfili='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pa{0:03d}.nc'.format(t-12)
-            data_gl=xr.open_dataset(nfili)
-            prcp=data_gl["tot_precip"].squeeze('t_1').squeeze('surface').sel(longitude=slice(nn[0],
-                                        nn[1]),
-                                        latitude=slice(nn[2],
-                                                       nn[3]))
-            # regrid before calculation 
-            prcp_gl[i,:,:]=prcp.interp(longitude=prcp_4p4["longitude"],
-                                       latitude=prcp_4p4["latitude"],
-                                       method="linear")
-
-        # also regrid GPM data
-        prcp_gpm = prcp_gpm.interp(lon=prcp_4p4["longitude"],lat=prcp_4p4["latitude"],
-                                   method="linear")
-
-        # calculate accumulated rainfall at each time and plot 
-        prcp_gpm = fp.acc_prcp(prcp_gpm, 'gpm', bv_lat, bv_lon, r0=inargs.r0, plt_prcp=False)
-        prcp_4p4 = fp.acc_prcp(prcp_4p4, '4p4', bv_lat, bv_lon, r0=inargs.r0, plt_prcp=False)
-        prcp_gl = fp.acc_prcp(prcp_gl, 'n768', bv_lat, bv_lon, r0=inargs.r0, plt_prcp=False)
-
-        # set up plot
-        fig, ax = plt.subplots(figsize=(10,6))
-        fili = './acc_prcp_oct2018_{0}deg.png'.format(inargs.r0)
-        # produce time series of accumulated rainfall 
-        ax.plot(bv_time, np.zeros(21), color='k', alpha=0.0)
-        ax.plot(bv_time[2:21:2], prcp_4p4, color='k', label='4.4 km MetUM')
-        ax.plot(bv_time[4:21:2], prcp_gl, color='b', label='Global MetUM')
-        ax.plot(bv_time[2:21:2], prcp_gpm, color='r', label='GPM-IMERG')
-        # add details (grid, legend, labels)
-        ax.set(xlabel='Time', ylabel='Accumulated rainfall (mm)',
-               title='Accumulated rainfall following the vortex')
-        ax.grid(True); ax.legend(loc='upper left')
-        fig.savefig(fili,dpi=200)
-        exit()
-
-    # FUNCTION 7 --> calculate and plot vbar, ubar or circ 
+    # FUNCTION 7 --> calculate and plot vbar, ubar or circ
 
     # read in N768 data using xarray
     if inargs.var == 'circ' or inargs.var == 'ubar' or inargs.var == 'node':
@@ -1423,6 +1356,77 @@ def overlay_vortex_position(vortex_path, variable_arr, fig):
     ax.add_patch(Rectangle((bv_lon[ind] - inargs.r0, bv_lat[ind] - inargs.r0),
                            2 * inargs.r0, 2 * inargs.r0, linewidth=2,
                            facecolor='none', edgecolor='c'))
+
+    return fig
+
+
+def plot_prcp_time_series(bounds, vortex_path, vortex_box_radius):
+
+    METUM_4p4_PATH = '/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld_pverb.pp'
+    pcubes = iris.load(METUM_4p4_PATH)
+    prcp_4p4_metum = xr.DataArray.from_iris(pcubes.extract('stratiform_rainfall_flux')[1])
+    prcp_4p4_metum = prcp_4p4_metum.sel(longitude=slice(bounds[0], bounds[1]), latitude=slice(bounds[2], bounds[3]))
+
+    GPM_PATH = '/nobackup/earshar/borneo/GPMHH_201810.nc'
+    gpm_data = xr.open_dataset(GPM_PATH).sel(lon=slice(bounds[0], bounds[1]), lat=slice(bounds[2], bounds[3]))
+    prcp_gpm = gpm_data.precipitationCal
+
+    Tp = [24, 36, 48, 60, 72, 84, 96, 108, 120]
+    prcp_n768_metum_dims = [len(Tp), prcp_4p4_metum.latitude.shape[0], prcp_4p4_metum.longitude.shape[0]]
+    prcp_gpm_resample_12h = prcp_gpm.resample(time="12H").sum().sel(time=slice('2018-10-22T12',
+                                                                               '2018-10-26T12'))
+
+    prcp_n768_metum = xr.DataArray(np.ones(prcp_n768_metum_dims),
+                           dims=["time", "latitude", "longitude"],
+                           coords={
+                               "time": prcp_gpm_resample_12h.time,
+                               "latitude": prcp_4p4_metum.latitude,
+                               "longitude": prcp_4p4_metum.longitude,
+                           },
+                           )
+
+    for i, t in enumerate(Tp):
+        METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pa{0:03d}.nc'.format(t - 12)
+        data_n768_metum = xr.open_dataset(METUM_N768_PATH)
+        data_n768_metum=data_n768_metum["tot_precip"].squeeze('t_1').squeeze('surface').sel(longitude=slice(bounds[0],
+                                                                                                            bounds[1]),
+                                                                                            latitude=slice(bounds[2],
+                                                                                                           bounds[3]))
+        # interpolate N768 MetUM data onto 4p4 MetUM grid
+        prcp_n768_metum[i, :, :] = data_n768_metum.interp(longitude=prcp_4p4_metum["longitude"],
+                                                          latitude=prcp_4p4_metum["latitude"],
+                                                          method="linear")
+
+    # also interpolate GPM data onto 4p4 MetUM grid
+    prcp_gpm = prcp_gpm.interp(lon=prcp_4p4_metum["longitude"],
+                               lat=prcp_4p4_metum["latitude"],
+                               method="linear")
+
+    fig = calc_acc_prcp_time_series(vortex_path, prcp_gpm, prcp_4p4_metum, prcp_n768_metum, vortex_box_radius)
+
+    return fig
+
+
+def calc_acc_prcp_time_series(vortex_path, prcp_gpm, prcp_4p4_metum, prcp_n768_metum, vortex_box_radius):
+
+    bv_lat, bv_lon, bv_time = extract_vortex_info(vortex_path)
+
+    acc_prcp_gpm = fp.calc_area_ave_acc_prcp(prcp_gpm, 'gpm', bv_lat, bv_lon, r0=vortex_box_radius, plt_prcp=False)
+    acc_prcp_4p4 = fp.calc_area_ave_acc_prcp(prcp_4p4_metum,'4p4',bv_lat,bv_lon,r0=vortex_box_radius,plt_prcp=False)
+    acc_prcp_n768 = fp.calc_area_ave_acc_prcp(prcp_n768_metum,'n768',bv_lat,bv_lon,r0=vortex_box_radius,plt_prcp=False)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(bv_time, np.zeros(21), color='k', alpha=0.0)
+    ax.plot(bv_time[2:21:2], acc_prcp_4p4, color='k', label='4.4 km MetUM')
+    ax.plot(bv_time[4:21:2], acc_prcp_n768, color='b', label='Global MetUM')
+    ax.plot(bv_time[2:21:2], acc_prcp_gpm, color='r', label='GPM-IMERG')
+    ax.set(xlabel='Time', ylabel='Accumulated rainfall (mm)',
+           title='Time-series of area-averaged, accumulated rainfall')
+    ax.grid(True)
+    ax.legend(loc='upper left')
+
+    OUT_PATH = './acc_prcp_oct2018_{0}deg.png'.format(vortex_box_radius)
+    fig.savefig(OUT_PATH, dpi=200)
 
     return fig
 
