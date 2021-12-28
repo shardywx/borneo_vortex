@@ -27,16 +27,16 @@ import func_4p4 as fp
 
 def main(inargs):
     """
-    produce simple plots using 4.4 km MetUM data 
+    Produce plots of atmospheric variables using ERA5 reanalysis, MetUM forecast or satellite data
     """
 
     # FUNCTION 1 --> read in 4.4 km MetUM data (xarray)
     if inargs.data == '4p4':
-        sstr, dstr, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype=inargs.data)
+        sstr, date_str, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype=inargs.data)
     elif inargs.var == 'circ':
-        sstr, dstr, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype='4p4')
+        sstr, date_str, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype='4p4')
     else:
-        sstr, dstr, tstr = fp.open_file(inargs.input_file, inargs.hr)
+        sstr, date_str, tstr = fp.open_file(inargs.input_file, inargs.hr)
 
     # FUNCTION 2 (?) --> read in ERA5 reanalysis data (xarray)
     if inargs.data == 'era5':
@@ -46,91 +46,19 @@ def main(inargs):
             era_file = '/nobackup/earshar/borneo/bv_oct2018.grib'
         era5 = xr.open_dataset(era_file, engine="cfgrib").metpy.parse_cf()
 
-    # FUNCTION 3 --> read in BV track data and extract track information 
+    # FUNCTION 3 --> read in BV track data and extract track information
+    VORTEX_PATH = '/nobackup/earshar/borneo/bv_2018102112_track.csv'
+    bv_lat, bv_lon, bv_time = extract_vortex_info(VORTEX_PATH)
 
-    # read in Kevin Hodges' Borneo vortex track data from text file
-    df = pd.read_csv('/nobackup/earshar/borneo/bv_2018102112_track.csv',
-                     na_filter=True,na_values="1.000000e+25")
-
-    # convert time integers to datetime objects
-    df['Time'] = pd.to_datetime(df['Time'], format='%Y%m%d%H')
-
-    # extract track information between 12Z on 21st and 26th October
-    bv_lat = df.loc[0:20, "lat_vort"]; bv_lon = df.loc[0:20, "lon_vort"]
-    bv_time = df.loc[0:20, "Time"]
-
-    """                                                                                      
-    # get correct BV centre information to calculate circulation                             
-    filter = bv_time==vort.coords['t'].data                                                  
-    # find element of 'bv_time' that matches the time of our model data                      
-    time_match = bv_time.where(filter).notna()                                               
-    # retrive the index of the element above and use to get the BV centre                    
-    ind = int(time_match.loc[time_match==True].index.values)                                 
-                                                                                                 
-    # overlay Borneo vortex track (ERA-Interim)                                              
-    ax.plot(bv_lon[ind], bv_lat[ind], 'cD--', markersize=7)                                  
-    """
 
     # FUNCTION 4 --> subset the data
-    if inargs.plot_type == 'xz':
-        nn = [87.0, 135.0, -3.0, 20.0]
-        #nn = [88.0, 130.0, -6.0, 23.0]
-        """
-        if inargs.hr < 12:
-            nn = [98.0, 133.0, -3.0, 20.0]
-        elif inargs.hr > 96:
-            nn = [88.0, 123.0, -3.0, 20.0]
-        else:
-            nn = [93.0, 123.0, -3.0, 20.0]
-        """
-    else:
-        nn = [88.0, 130.0, -6.0, 23.0]
-        #nn = [98.0, 133.0, -3.0, 20.0]
-        #nn = [93.0, 130.0, -3.0, 21.0] / nn = [88.0, 125.0, -3.0, 21.0]
+    bounds = define_plot_bounds(inargs.plot_type)
 
-    # FUNCTION 5 --> read in Himawari data                                                                  
+
+    # FUNCTION 5 --> read in Himawari data
     if inargs.var == 'hima':
-        hstr = dstr.strftime("%Y%m%d_%H00") # create string to read in data from single file 
-        hima_nc = '/nobackup/earshar/borneo/himawari/himawari_10.4_{0}.4p4km.nc'.format(hstr)
-        fili = './himawari_bt_{0}.png'.format(hstr)
-        himawari = xr.open_dataset(hima_nc).metpy.parse_cf()
-        himawari = himawari.sel(longitude=slice(nn[0],nn[1]),latitude=slice(nn[2],nn[3]) )
-        t_bright = himawari.T_b
+        himawari_plot = plot_t_bright_himawari(date_str, bounds, VORTEX_PATH)
 
-        # set up plot of Himawari data                                                           
-        fig = plt.figure(figsize=(10,6))                                                         
-        ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))              
-        ax.add_feature(cfeature.COASTLINE.with_scale('50m'),edgecolor='blue',linewidth=1.0)
-        plt.gca().gridlines(color='grey', linestyle='--', linewidth=0.5)
-
-        # overlay lat/lon labels 
-        xint = 5; yint = 3
-        ns = np.rint(t_bright.longitude[0].data); nf = np.rint(t_bright.longitude[-1].data)
-        ts = np.rint(t_bright.latitude[0].data); tf = np.rint(t_bright.latitude[-1].data)
-        ax.set_xticks(np.arange(ns, nf+1, xint))
-        ax.set_xticklabels(np.arange(ns, nf+1, xint))
-        ax.set_yticks(np.arange(ts, tf+1, yint))
-        ax.set_yticklabels(np.arange(ts, tf+1, yint))
-
-        # filled contour plot                                                                    
-        t_bright.plot.contourf(ax=ax, extend='max', transform=ccrs.PlateCarree(),                
-                               cbar_kwargs={'label': 'K'},                                     
-                               cmap='gist_yarg')
-
-        # find index of vortex centre information that matches the chosen time 
-        filter = bv_time==t_bright.coords['time'].data
-        time_match = bv_time.where(filter).notna()
-        ind = int(time_match.loc[time_match==True].index.values)
-
-        # overlay vortex box position 
-        ax.add_patch( Rectangle( (bv_lon[ind]-inargs.r0, bv_lat[ind]-inargs.r0),
-                                 2*inargs.r0, 2*inargs.r0, linewidth=2,
-                                 facecolor='none', edgecolor='c') )
-
-        # save and exit
-        plt.title('')
-        plt.savefig(fili,dpi=200)
-        exit()
 
     # FUNCTION 6 --> read in precip data and produce time-serires plot 
 
@@ -1417,8 +1345,90 @@ def main(inargs):
         var_cbar.set_label(cb_label)
         plt.savefig(fili,dpi=200)
 
+def extract_vortex_info(VORTEX_PATH):
+
+    # read in Kevin Hodges' Borneo vortex track data from text file
+    vortex_df = pd.read_csv(VORTEX_PATH, na_filter=True, na_values="1.000000e+25")
+
+    # convert time integers to datetime objects
+    vortex_df['Time'] = pd.to_datetime(df['Time'], format='%Y%m%d%H')
+
+    # extract track information between 12Z on 21st and 26th October
+    vortex_lat = vortex_df.loc[0:20, "lat_vort"];
+    vortex_lon = vortex_df.loc[0:20, "lon_vort"]
+    vortex_time = vortex_df.loc[0:20, "Time"]
+
+    return vortex_lat, vortex_lon, vortex_time
+
+
+def define_plot_bounds(plot_type):
+
+    if plot_type == 'xz':
+        bounds = [87.0, 135.0, -3.0, 20.0]
+    else:
+        bounds = [88.0, 130.0, -6.0, 23.0]
+
+    return bounds
+
+
+def plot_t_bright_himawari(date_str, bounds, vortex_path):
+
+    single_date_str = date_str.strftime("%Y%m%d_%H00")
+    HIMAWARI_PATH = '/nobackup/earshar/borneo/himawari/himawari_10.4_{0}.4p4km.nc'.format(single_date_str)
+    OUT_PATH = './himawari_t_bright_{0}.png'.format(single_date_str)
+    himawari_data = xr.open_dataset(HIMAWARI_PATH).metpy.parse_cf()
+    himawari_data = himawari_data.sel(longitude=slice(bounds[0], bounds[1]),
+                                      latitude=slice(bounds[2], bounds[3]))
+    t_bright = himawari_data.T_b
+
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))
+    ax.add_feature(cfeature.COASTLINE.with_scale('50m'), edgecolor='blue', linewidth=1.0)
+    plt.gca().gridlines(color='grey', linestyle='--', linewidth=0.5)
+    ax = overlay_lat_lon_labels(t_bright, ax)
+
+    t_bright.plot.contourf(ax=ax, extend='max', transform=ccrs.PlateCarree(),
+                           cbar_kwargs={'label': 'K'},
+                           cmap='gist_yarg')
+
+    fig = overlay_vortex_position(vortex_path, t_bright, fig)
+    plt.title('')
+    plt.savefig(OUT_PATH, dpi=200)
+
+    return fig
+
+
+def overlay_lat_lon_labels(variable_arr, ax):
+
+    lon0, lon1 = np.rint([variable_arr.longitude[0].data, variable_arr.longitude[-1].data])
+    lat0, lat1 = np.rint([variable_arr.latitude[0].data, variable_arr.latitude[-1].data])
+    xint = 5; yint = 3
+
+    ax.set_xticks(np.arange(lon0, lon1 + 1, xint))
+    ax.set_xticklabels(np.arange(lon0, lon1 + 1, xint))
+    ax.set_yticks(np.arange(lat0, lat1 + 1, yint))
+    ax.set_yticklabels(np.arange(lat0, lat1 + 1, yint))
+
+    return ax
+
+
+def overlay_vortex_position(vortex_path, variable_arr, fig):
+
+    bv_lat, bv_lon, bv_time = extract_vortex_info(vortex_path)
+
+    filter = bv_time == variable_arr.coords['time'].data
+    time_match = bv_time.where(filter).notna()
+    ind = int(time_match.loc[time_match == True].index.values)
+
+    ax.add_patch(Rectangle((bv_lon[ind] - inargs.r0, bv_lat[ind] - inargs.r0),
+                           2 * inargs.r0, 2 * inargs.r0, linewidth=2,
+                           facecolor='none', edgecolor='c'))
+
+    return fig
+
+
 if __name__ == '__main__':
-    description = 'Plot data from a 4.4 km MetUM forecast'
+    description = 'Plot atmospheric variables from ERA5 reanalysis, MetUM forecast or satellite data'
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument("input_file", type=str, help="MetUM input file path")
