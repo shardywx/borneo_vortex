@@ -30,103 +30,34 @@ def main(inargs):
     Produce plots of atmospheric variables using ERA5 reanalysis, MetUM forecast or satellite data
     """
 
-    # FUNCTION 1 --> read in 4.4 km MetUM data (xarray)
-    if inargs.data == '4p4':
-        sstr, date_str, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype=inargs.data)
-    elif inargs.var == 'circ':
-        sstr, date_str, tstr, data_pc, data_pd = fp.open_file(inargs.input_file, inargs.hr, ftype='4p4')
-    else:
-        sstr, date_str, tstr = fp.open_file(inargs.input_file, inargs.hr)
-
-    # FUNCTION 2 --> read in ERA5 reanalysis data (xarray)
-    if inargs.data == 'era5':
-        if inargs.hr < 0:
-            ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
-        else:
-            ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018.grib'
-        era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
-
-    # FUNCTION 3 --> read in BV track data and extract track information
+    # FUNCTION 1 --> read in BV track data and extract track information
     VORTEX_PATH = '/nobackup/earshar/borneo/bv_2018102112_track.csv'
     bv_lat, bv_lon, bv_time = extract_vortex_info(VORTEX_PATH)
 
 
-    # FUNCTION 4 --> subset the data
+    # FUNCTION 2 --> subset the data
     bounds = define_plot_bounds(inargs.plot_type)
 
 
-    # FUNCTION 5 --> plot Himawari brightness temperature data
+    # FUNCTION 3 --> plot Himawari brightness temperature data
     if inargs.var == 'hima':
         himawari_plot = plot_t_bright_himawari(date_str, bounds, VORTEX_PATH)
-    # FUNCTION 6 --> produce time-series plot of accumulated precipitation
+    # FUNCTION 4 --> produce time-series plot of accumulated precipitation
     elif inargs.var == 'prcp':
         prcp_time_series_plot = plot_prcp_time_series(bounds, VORTEX_PATH, inargs.r0)
-    # FUNCTION 7 --> calculate and plot vbar, ubar or circ
+    # FUNCTION 5 --> calculate and plot vbar, ubar or circ
     elif inargs.var == 'ubar':
         mean_uwind_plot = plot_mean_uwind(bounds, inargs.r0, date_str)
     elif inargs.var == 'node':
         mean_vwind_plot = plot_mean_vwind(bounds, inargs.r0, date_str)
     elif inargs.var == 'circ':
-        ### START FROM THIS FUNCTION AT BOTTOM OF SCRIPT
-        circ_time_series_plot = plot_circ_time_series()
-
-
-    # FUNCTION 8 --> general reading in of data 
-
-    # if not calculating area-averaged vorticity or zonally-averaged zonal wind 
+        circ_time_series_plot = plot_circ_time_series(bounds, inargs.hr, VORTEX_PATH)
+    # FUNCTION 6 --> general reading in of data
     else:
+        data = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
 
-        if inargs.data == '4p4':
-            data_pc = fp.subset(data_pc, nn, var=inargs.var, vtime=dstr)
-            data_pd = fp.subset(data_pd, nn, var=inargs.var, vtime=dstr)
-        elif inargs.data == 'era5':
-            era5 = fp.subset(era5, nn, var=inargs.var, vtime=dstr)
-        else:
-        # read in N768 and SGT tool data (deleted on 20/09/21 --> replaced from scratch)
-            variabledict={}
-            for name in output_names:
-                var_name='{}'.format(name)
-                diri='/nobackup/earshar/borneo/SGTool/N768/oct/{0}/filter_4_8/conv_g7x_v5/'.format(inargs.sgt)
-                if inargs.hr == 0:
-                    Tp = int(inargs.hr) + 12
-                else:
-                    Tp = int(inargs.hr)
-                fn = '{0}/OUT_{1}_{2}_T{3:03d}.nc'.format(diri,name,sstr,Tp)
-                variabledict[name] = iris.load(fn)[0]
-                variabledict[name].rename(name)
 
-            # SGT tool 
-            w_sgt = xr.DataArray.from_iris(variabledict['w'].extract('w')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            v_sgt = xr.DataArray.from_iris(variabledict['v'].extract('v')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            u_sgt = xr.DataArray.from_iris(variabledict['u'].extract('u')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            ug_sgt=xr.DataArray.from_iris(variabledict['ug'].extract('ug')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            vg_sgt=xr.DataArray.from_iris(variabledict['vg'].extract('vg')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            ug_um=xr.DataArray.from_iris(variabledict['ug_um'].extract('ug_um')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-            vg_um=xr.DataArray.from_iris(variabledict['vg_um'].extract('vg_um')).sel(longitude=slice(nn[0],
-                                        nn[1]),latitude=slice(nn[2],nn[3]))
-
-            # N768 MetUM 
-            if inargs.hr == 0:
-                Tp = int(inargs.hr)
-            else:
-                Tp = int(inargs.hr) - 12
-            gl_pe='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe{0:03d}.nc'.format(Tp)
-            gl_pb='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pb{0:03d}.nc'.format(Tp)
-            data_pe=xr.open_dataset(gl_pe).metpy.assign_crs(grid_mapping_name='latitude_longitude',
-                                                            earth_radius=6371229.0)
-            data_pb=xr.open_dataset(gl_pb).metpy.assign_crs(grid_mapping_name='latitude_longitude',
-                                                            earth_radius=6371229.0)
-            gdata_pe=data_pe.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]),
-                                  longitude_1=slice(nn[0], nn[1]), latitude_1=slice(nn[2], nn[3]) )
-            gdata_pb=data_pb.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]) )
-
-    # FUNCTION 9 --> interpolate N768 MetUM and SGT tool data onto specified levels
+    # FUNCTION 7 --> interpolate N768 MetUM and SGT tool data onto specified levels
 
     # N768 onto 4p4 
     if inargs.data == 'n768' or inargs.data == 'sgt':
@@ -1156,7 +1087,7 @@ def extract_vortex_info(VORTEX_PATH):
     vortex_df = pd.read_csv(VORTEX_PATH, na_filter=True, na_values="1.000000e+25")
 
     # convert time integers to datetime objects
-    vortex_df['Time'] = pd.to_datetime(df['Time'], format='%Y%m%d%H')
+    vortex_df['Time'] = pd.to_datetime(vortex_df['Time'], format='%Y%m%d%H')
 
     # extract track information between 12Z on 21st and 26th October
     vortex_lat = vortex_df.loc[0:20, "lat_vort"];
@@ -1397,31 +1328,40 @@ def plot_mean_uwind(bounds, vortex_box_radius, date_str):
     return fig
 
 
-def plot_circ_time_series():
+def plot_circ_time_series(bounds, output_time, vortex_path):
 
-    ### START FROM HERE
-    era5 = fp.subset(era5, nn, var=inargs.var)
-    data = fp.subset(data_pd, nn, var=inargs.var)
+    ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018.grib'
+    era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
+    data_era5 = fp.subset(era5, bounds, var="circ")
 
-    circ_era = fp.calc_circ(era5.u, era5.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
-    circ_4p4 = fp.calc_circ(data.u, data.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
-    circ_gl = fp.calc_circ(u_gl, v_gl, bv_lat, bv_lon, mlev=inargs.mlev, r0=inargs.r0)
+    METUM_4p4_PATH = '/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld'
+    _, date_str, _, data_pc, data_pd = fp.open_file(METUM_4p4_PATH, output_time, file_type='4p4')
+    data_4p4_metum = fp.subset(data_pd, bounds, var="circ")
 
-    # set up plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    fili = './circ_oct2018_{0}deg.png'.format(inargs.r0)
-    # produce time series of circulation
+    data_n768_metum = read_all_n768_metum(bounds)
+    uwind = data_n768_metum.u
+    vwind = data_n768_metum.v
+
+    bv_lat, bv_lon, bv_time = extract_vortex_info(vortex_path)
+
+    circ_era5 = fp.calc_circ(data_era5.u, data_era5.v, bv_lat, bv_lon, plev=800, r0=3.0)
+    circ_4p4 = fp.calc_circ(data_4p4_metum.u, data_4p4_metum.v, bv_lat, bv_lon, plev=800, r0=3.0)
+    circ_n768 = fp.calc_circ(uwind, vwind, bv_lat, bv_lon, mlev=2000, r0=3.0)
+
+    fig, ax = plt.subplots(figsize=(10, 6)
     ax.plot(bv_time, circ_4p4, color='k', label='4.4 km MetUM')
-    ax.plot(bv_time[4:21:2], circ_gl, color='b', label='Global MetUM')
-    ax.plot(bv_time, circ_era, color='r', label='ERA5 reanalysis')
-    # add details (grid, legend, labels)
-    var_str = 'Area-averaged relative vorticity'
+    ax.plot(bv_time[4:21:2], circ_n768, color='b', label='Global MetUM')
+    ax.plot(bv_time, circ_era5, color='r', label='ERA5 reanalysis')
+
+    variable_str = 'Area-averaged relative vorticity'
     ax.set(xlabel='Time',
-           ylabel=r'Area-averaged relative vorticity ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)',
-           title='Area-averaged relative vorticity following the vortex')
-    ax.grid(True);
+           ylabel=f'{variable_str} ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)',
+           title=f'{variable_str} following the vortex')
+    ax.grid(True)
     ax.legend(loc='upper left')
-    fig.savefig(fili, dpi=200)
+
+    OUT_PATH = './circ_oct2018_{0}deg.png'.format(inargs.r0)
+    fig.savefig(OUT_PATH, dpi=200)
 
     return fig
 
@@ -1439,6 +1379,121 @@ def read_all_n768_metum(bounds):
     # u_gl=gdata_pe.u; v_gl=gdata_pe.v; w_gl=gdata_pe.dz_dt; pv_gl=gdata_pe.field83
 
     return data_n768_metum
+
+
+def open_era5(validity_time):
+
+    if validity_time < 0:
+        ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018_early.grib'
+    else:
+        ERA5_PATH = '/nobackup/earshar/borneo/bv_oct2018.grib'
+    era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
+
+    return era5
+
+
+def read_data(data_type, output_time, sgt_run):
+
+    METUM_4p4_PATH = f'/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld'
+    ERA5_PATH = f'/nobackup/earshar/borneo/bv_oct2018.grib'
+    SGT_TOOL_PATH = f'/nobackup/earshar/borneo/SGTool/N768/oct/{sgt_run}/filter_4_8/conv_g7x_v5/'
+    METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa'
+
+    if data_type == '4p4':
+        start_fcst_str, date_str, tstr, data_pc, data_pd = fp.open_file(METUM_4p4_PATH, output_time, ftype='4p4')
+        data_4p4_pc = subset(data_pc, bounds, validity_time=date_str)
+        data_4p4_pd = subset(data_pd, bounds, validity_time=date_str)
+
+        data_4p4 = xr.combine_by_coords([data_4p4_pc.squeeze(['t', 't_1']),
+                                         data_4p4_pd.squeeze(['t', 't_1'])])
+
+    elif data_type == 'era5':
+        era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
+        _, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, ftype='era5')
+        data_era5 = subset(era5, bounds, validity_time=date_str)
+
+    else: # data_type == 'sgt' or data_type == 'n768'
+
+        # SGT tool
+        variabledict={}
+        data_sgt = {}
+        for name in output_names:
+            if output_time == 0:
+                time_str = int(output_time) + 12
+            else:
+                time_str = int(output_time)
+
+            start_fcst_str, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, ftype='sgt')
+            SGT_FILE_NAME = f'{SGT_TOOL_PATH}/OUT_{name}_{start_fcst_str}_T{Tp:03d}.nc'
+            variabledict[name] = iris.load(SGT_FILE_NAME)[0]
+            variabledict[name].rename(name)
+            data_sgt[name] = xr.DataArray.from_iris(variabledict[name].extract(name)).sel(longitude=slice(bounds[0],
+                                          bounds[1]),latitude=slice(bounds[2],bounds[3]))
+
+        # N768 MetUM
+        if output_time == 0:
+            time_str = int(output_time)
+        else:
+            time_str = int(output_time) - 12
+        data_n768_pe=f'{METUM_N768_PATH}_pe{time_str:03d}.nc'
+        data_n768_pb=f'{METUM_N768_PATH}_pb{time_str:03d}.nc'
+        data_768_pe=xr.open_dataset(data_n768_pe).metpy.assign_crs(grid_mapping_name='latitude_longitude',
+                                                                   earth_radius=6371229.0)
+        data_768_pb=xr.open_dataset(data_n768_pb).metpy.assign_crs(grid_mapping_name='latitude_longitude',
+                                                                   earth_radius=6371229.0)
+        data_pe=data_768_pe.sel(longitude=slice(bounds[0], bounds[1]), latitude=slice(bounds[2], bounds[3]),
+                                longitude_1=slice(bounds[0], bounds[1]), latitude_1=slice(bounds[2], bounds[3]) )
+        data_pb=data_768_pb.sel(longitude=slice(bounds[0], bounds[1]), latitude=slice(bounds[2], bounds[3]) )
+
+        if time_str == 0:
+            data_n768 = xr.combine_by_coords([data_pe, data_pb])
+        else:
+            data_n768 = xr.combine_by_coords([data_pe.squeeze('t'),
+                                              data_pb.squeeze('t')])
+
+    if data_type == '4p4':
+        return data_4p4
+    elif data_type == 'era5':
+        return data_era5
+    else: # data_type == 'n768' or data_type == 'sgt'
+        return data_n768, data_sgt
+
+def subset(data, bounds, validity_time=[]):
+    """
+    create subset of gridded data
+
+    Args:
+      data (xarray data array): multi-dimensional data array
+      bounds (list): latitude / longitude bounds for subset
+
+    Kwargs:
+      var (str): variable to plot
+      vtime (datetime object): validity time (e.g. 12Z on 23rd Oct 2018)
+    """
+
+    coords = data.coords.dims
+    for c in coords:
+        if c == 'p':
+            dataset = '4p4'
+        elif c == 'isobaricInhPa':
+            dataset = 'era5'
+        elif c == 'hybrid_ht_1':
+            dataset = 'n768'
+
+    if dataset == '4p4':
+        data = data.sel(t_1=slice(validity_time, validity_time),
+                        t=slice(validity_time, validity_time),
+                        longitude=slice(bounds[0], bounds[1]),
+                        latitude=slice(bounds[2], bounds[3]),
+                        longitude_1=slice(bounds[0], bounds[1]),
+                        latitude_1=slice(bounds[2], bounds[3]))
+    else: # dataset == 'era5'
+        data = data.reindex(latitude=data.latitude[::-1])  # rearrange to S --> N
+        data = data.sel(time=slice(validity_time, validity_time),
+                        longitude=slice(bounds[0], bounds[1]),
+                        latitude=slice(bounds[2], bounds[3]))
+
+    return data
 
 
 if __name__ == '__main__':
