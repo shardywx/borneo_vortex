@@ -61,143 +61,15 @@ def main(inargs):
     # FUNCTION 6 --> produce time-series plot of accumulated precipitation
     elif inargs.var == 'prcp':
         prcp_time_series_plot = plot_prcp_time_series(bounds, VORTEX_PATH, inargs.r0)
-
-
     # FUNCTION 7 --> calculate and plot vbar, ubar or circ
+    elif inargs.var == 'ubar':
+        mean_uwind_plot = plot_mean_uwind(bounds, inargs.r0, date_str)
+    elif inargs.var == 'node':
+        mean_vwind_plot = plot_mean_vwind(bounds, inargs.r0, date_str)
+    elif inargs.var == 'circ':
+        ### START FROM THIS FUNCTION AT BOTTOM OF SCRIPT
+        circ_time_series_plot = plot_circ_time_series()
 
-    # read in N768 data using xarray
-    if inargs.var == 'circ' or inargs.var == 'ubar' or inargs.var == 'node':
-
-        # N768 file path 
-        gl_pe='/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe*.nc'
-        # need to manually specify the coordinate reference system (CRS; ?)
-        data_pe=xr.open_mfdataset(gl_pe, combine='by_coords', chunks={"t": 5}).metpy.parse_cf()
-        # subset data 
-        gdata_pe=data_pe.sel( longitude=slice(nn[0], nn[1]), latitude=slice(nn[2], nn[3]),
-                              longitude_1=slice(nn[0], nn[1]), latitude_1=slice(nn[2], nn[3]) )
-        u_gl=gdata_pe.u; v_gl=gdata_pe.v; w_gl=gdata_pe.dz_dt; pv_gl=gdata_pe.field83
-
-        # calculate meridionally-averaged meridional wind (v_bar)
-        if inargs.var == 'node':
-
-            # set up height coordinates
-            ht_coords = gdata_pe.v['hybrid_ht_1'].data.astype('int32')
-
-            # interpolate to new lat/lon grid 
-            # EDIT FROM HERE (why are duplicate dimensions in 'v' but not 'u'?)
-            v_bar = v_gl.interp(latitude_1=u_gl["latitude"],
-                                method="linear").assign_coords(height_levels=("hybrid_ht",
-                                ht_coords)).swap_dims({"hybrid_ht":
-                                                       "height_levels"})
-
-            test = xr.DataArray.drop_duplicates(v_bar)
-
-            # calculate mean over latitude and time 
-            v_bar = v_bar.sel(longitude=slice(nn[0], nn[1]),
-                              latitude=slice(2.0,
-                    8.0) ).mean(dim=['latitude']).sel(height_levels=slice(50, 15000))
-
-            # interpolate to new height levels 
-            ht_coords = np.arange(0, 15000, 250)
-            arr = v_bar.interp(height_levels=ht_coords,method="linear")
-
-            # interpolate onto regular lat/lon grid before plotting 
-            lon_dim = np.arange(np.rint(arr.longitude[0].data),
-                                np.rint(arr.longitude[-1].data)+0.25, 0.25)
-            arr = arr.interp(longitude=lon_dim, method="linear")
-
-            # produce x-y plot of averaged meridional wind at two levels (e.g. 2 km and 7 km)
-            fig, ax = plt.subplots(figsize=(10,6))
-            fili = './vbar_oct2018_{0}deg.png'
-            test = arr.sel(height_levels=2000, t=dstr)
-
-            ax.plot(arr.longitude, arr.sel(height_levels=2000, t=dstr), 
-                    color='k', label='Meridional wind at 2 km')
-            ax.plot(arr.longitude, arr.sel(height_levels=7000, t=dstr), 
-                    color='b', label='Meridional wind at 7 km')
-            ax.grid(True); ax.legend(loc='upper left')
-            fig.savefig(fili,dpi=200)
-            exit()
-
-        # calculate and plot zonally-averaged zonal wind (u_bar)
-        if inargs.var == 'ubar':
-
-            print(gdata_pe)
-            exit()
-        
-            # set up height coordinates
-            ht_coords = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
-            # interpolate to new lat/lon grid 
-            u_bar = u_gl.interp(longitude_1=v_gl["longitude"],
-                                method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                ht_coords)).swap_dims({"hybrid_ht_1": 
-                                                       "height_levels"})
-
-            # calculate mean over longitude and time 
-            u_bar = u_bar.sel(longitude=slice(95.0, 120.0), 
-                              latitude=slice(0.0,
-                    15.0) ).mean(dim=['longitude','t']).sel(height_levels=slice(50, 15000))
-
-            # interpolate to new levels straight before plotting
-            ht_coords = np.arange(0, 15000, 250)
-            arr = u_bar.interp(height_levels=ht_coords,method="linear")
-
-            # interpolate onto regular lat/lon grid before plotting 
-            lat_dim = np.arange(np.rint(arr.latitude[0].data),
-                                np.rint(arr.latitude[-1].data)+0.25, 0.25)
-            arr = arr.interp(latitude=lat_dim, method="linear")
-
-            # colour map and contour levels
-            dl = 1.0; vmin = -20.0; vmax = -vmin + dl
-            Cmap,norm,Levels=normalise_cmap(vmin,vmax,0,dl,'bwr')
-            cb_label = 'Mean zonal wind (m s-1)'
-
-            # set up plot and axes 
-            fig = plt.figure(figsize=[9,6])
-            ax = plt.axes()
-            var_contour = plt.contourf(arr, levels=Levels, extend='max', cmap=Cmap)
-            var_cbar = fig.colorbar(var_contour)
-
-            # set up tickmarks and labels
-            ax.grid(True)
-            xint = 1; yint = 1
-            ts = np.rint(arr.latitude[0].data); tf = np.rint(arr.latitude[-1].data)
-            dim_size = len(arr.latitude); ax.set_xlabel('Latitude (degrees north)')
-            ax.set_xticks(np.arange(0, dim_size+1, 4) )
-            ax.set_xticklabels(np.arange(ts, tf+1, yint) )
-            mlev_size = len(arr.height_levels)
-            ax.set_yticks(np.arange(0, mlev_size, 4) )
-            ax.set_yticklabels(arr.height_levels[::4].data); ax.set_ylabel('Height (m)')
-            var_cbar.set_label(cb_label)
-            fili='./ubar_n768.png'
-            plt.savefig(fili,dpi=200)
-            exit()
-
-        # calculate and plot area-averaged relative vorticity (circulation)
-        elif inargs.var == 'circ':
-
-            era5 = fp.subset(era5, nn, var=inargs.var)
-            data = fp.subset(data_pd, nn, var=inargs.var)
-
-            circ_era  = fp.calc_circ(era5.u, era5.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
-            circ_4p4  = fp.calc_circ(data.u, data.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
-            circ_gl   = fp.calc_circ(u_gl, v_gl, bv_lat, bv_lon, mlev=inargs.mlev, r0=inargs.r0)
-
-            # set up plot
-            fig, ax = plt.subplots(figsize=(10,6))
-            fili = './circ_oct2018_{0}deg.png'.format(inargs.r0)
-            # produce time series of circulation
-            ax.plot(bv_time, circ_4p4, color='k', label='4.4 km MetUM')
-            ax.plot(bv_time[4:21:2], circ_gl, color='b', label='Global MetUM')
-            ax.plot(bv_time, circ_era, color='r', label='ERA5 reanalysis')
-            # add details (grid, legend, labels)
-            var_str = 'Area-averaged relative vorticity'
-            ax.set(xlabel='Time', 
-               ylabel=r'Area-averaged relative vorticity ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)',
-               title='Area-averaged relative vorticity following the vortex')
-            ax.grid(True); ax.legend(loc='upper left')
-            fig.savefig(fili,dpi=200)
-            exit()
 
     # FUNCTION 8 --> general reading in of data 
 
@@ -1429,6 +1301,144 @@ def calc_acc_prcp_time_series(vortex_path, prcp_gpm, prcp_4p4_metum, prcp_n768_m
     fig.savefig(OUT_PATH, dpi=200)
 
     return fig
+
+
+def plot_mean_vwind(bounds, vortex_box_radius, date_str):
+
+    data_n768_metum = read_all_n768_metum(bounds)
+    uwind = data_n768_metum.u
+    vwind = data_n768_metum.v
+    n768_ht_coords = vwind['hybrid_ht_1'].data.astype('int32')
+
+    # interpolate to new latitude grid and rename height coordinate
+    vwind = vwind.interp(latitude_1=uwind["latitude"],
+                         method="linear").assign_coords(height_levels=("hybrid_ht",
+                                                                       n768_ht_coords)).swap_dims({"hybrid_ht":
+                                                                        "height_levels"})
+
+    mean_vwind = vwind.sel(longitude=slice(bounds[0], bounds[1]),
+                           latitude=slice(2.0, 8.0)).mean(dim=['latitude']).sel(height_levels=slice(50, 15000))
+
+    n768_ht_coords = np.arange(0, 15000, 250)
+    mean_vwind = mean_vwind.interp(height_levels=n768_ht_coords, method="linear")
+
+    lon_dimension_subset = np.arange(np.rint(mean_vwind.longitude[0].data),
+                                     np.rint(mean_vwind.longitude[-1].data) + 0.25, 0.25)
+    mean_vwind = mean_vwind.interp(longitude=lon_dimension_subset, method="linear")
+
+
+    fig, ax = plt.subplots(1, 2, figsize=(8, 8))
+    ax[0,0].plot(mean_vwind.longitude, mean_vwind.sel(height_levels=2000, t=date_str),
+                 color='k', label='Meridional wind at 2 km')
+    ax[0,1].plot(mean_vwind.longitude, mean_vwind.sel(height_levels=7000, t=date_str),
+                 color='b', label='Meridional wind at 7 km')
+    ax.grid(True)
+    ax.legend(loc='upper left')
+
+
+    OUT_PATH = './mean_vwind_n768_{0}deg.png'.format(vortex_box_radius)
+    fig.savefig(OUT_PATH, dpi=200)
+
+    return fig
+
+
+def plot_mean_uwind(bounds, vortex_box_radius, date_str):
+
+    data_n768_metum = read_all_n768_metum(bounds)
+    uwind = data_n768_metum.u
+    vwind = data_n768_metum.v
+    n768_ht_coords = uwind['hybrid_ht_1'].data.astype('int32')
+
+    # interpolate to new longitude grid and rename height coordinate
+    uwind = uwind.interp(longitude_1=vwind["longitude"],
+                         method="linear").assign_coords(height_levels=("hybrid_ht_1",
+                                                                      n768_ht_coords)).swap_dims({"hybrid_ht_1":
+                                                                                                 "height_levels"})
+
+    mean_uwind = uwind.sel(longitude=slice(95.0, 120.0),
+                           latitude=slice(0.0, 15.0)).mean(dim=['longitude', 't']).sel(height_levels=slice(50, 15000))
+    n768_ht_coords = np.arange(0, 15000, 250)
+    mean_uwind = mean_uwind.interp(height_levels=n768_ht_coords, method="linear")
+
+    lat_dimension_subset = np.arange(np.rint(arr.latitude[0].data),
+                                     np.rint(arr.latitude[-1].data) + 0.25, 0.25)
+    mean_uwind = mean_uwind.interp(latitude=lat_dimension_subset, method="linear")
+
+
+    dl = 1.0; vmin = -20.0; vmax = -vmin + dl
+    Colourmap, _, Levels = normalise_cmap(vmin, vmax, 0, dl, 'bwr')
+    colourbar_label = 'Mean zonal wind (m s-1)'
+
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    mean_uwind_plot = plt.contourf(mean_uwind, levels=Levels, extend='max', cmap=Colourmap)
+    mean_uwind_cbar = fig.colorbar(mean_uwind_plot)
+
+
+    lat0, lat1 = np.rint([arr.latitude[0].data, arr.latitude[-1].data])
+    mean_uwind_lat_size = len(mean_uwind.latitude)
+
+    ax.set_xlabel('Latitude (degrees north)')
+    ax.set_xticks(np.arange(0, mean_uwind_lat_size + 1, 4))
+    ax.set_xticklabels(np.arange(lat0, lat1 + 1, 1))
+
+    mean_uwind_hgt_size = len(mean_uwind.height_levels)
+    ax.set_yticks(np.arange(0, mean_uwind_hgt_size, 4))
+    ax.set_yticklabels(mean_uwind.height_levels[::4].data)
+    ax.set_ylabel('Height (m)')
+
+    mean_uwind_cbar.set_label(colourbar_label)
+    ax.grid(True)
+
+
+    OUT_PATH = './mean_uwind_n768_{0}deg.png'.format(vortex_box_radius)
+    fig.savefig(OUT_PATH, dpi=200)
+
+    return fig
+
+
+def plot_circ_time_series():
+
+    ### START FROM HERE
+    era5 = fp.subset(era5, nn, var=inargs.var)
+    data = fp.subset(data_pd, nn, var=inargs.var)
+
+    circ_era = fp.calc_circ(era5.u, era5.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
+    circ_4p4 = fp.calc_circ(data.u, data.v, bv_lat, bv_lon, plev=inargs.plev, r0=inargs.r0)
+    circ_gl = fp.calc_circ(u_gl, v_gl, bv_lat, bv_lon, mlev=inargs.mlev, r0=inargs.r0)
+
+    # set up plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fili = './circ_oct2018_{0}deg.png'.format(inargs.r0)
+    # produce time series of circulation
+    ax.plot(bv_time, circ_4p4, color='k', label='4.4 km MetUM')
+    ax.plot(bv_time[4:21:2], circ_gl, color='b', label='Global MetUM')
+    ax.plot(bv_time, circ_era, color='r', label='ERA5 reanalysis')
+    # add details (grid, legend, labels)
+    var_str = 'Area-averaged relative vorticity'
+    ax.set(xlabel='Time',
+           ylabel=r'Area-averaged relative vorticity ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)',
+           title='Area-averaged relative vorticity following the vortex')
+    ax.grid(True);
+    ax.legend(loc='upper left')
+    fig.savefig(fili, dpi=200)
+
+    return fig
+
+
+def read_all_n768_metum(bounds):
+
+    METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe*.nc'
+    data_n768_metum = xr.open_mfdataset(METUM_N768_PATH, combine='by_coords', chunks={"t": 5}).metpy.parse_cf()
+    data_n768_metum = data_n768_metum.sel(longitude=slice(bounds[0], bounds[1]),
+                                          latitude=slice(bounds[2], bounds[3]),
+                                          longitude_1=slice(bounds[0], bounds[1]),
+                                          latitude_1=slice(bounds[2], bounds[3])
+                                          )
+
+    # u_gl=gdata_pe.u; v_gl=gdata_pe.v; w_gl=gdata_pe.dz_dt; pv_gl=gdata_pe.field83
+
+    return data_n768_metum
 
 
 if __name__ == '__main__':
