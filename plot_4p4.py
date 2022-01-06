@@ -54,8 +54,10 @@ def main(inargs):
         circ_time_series_plot = plot_circ_time_series(bounds, inargs.hr, VORTEX_PATH)
     # FUNCTION 6 --> general reading in of data
     else:
-        data = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
-
+        if inargs.data == '4p4' or inargs.data == 'era5':
+            data = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
+        else: # inargs.data == 'n768' or inargs.data == 'sgt'
+            data_n768, data_sgt = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
 
     # FUNCTION 7 --> interpolate N768 MetUM and SGT tool data onto specified levels
 
