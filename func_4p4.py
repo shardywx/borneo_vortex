@@ -42,49 +42,49 @@ class MidpointNormalize(colors.Normalize):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         return np.ma.masked_array(np.interp(value, x, y)) #, np.isnan(value))
 
-def open_file(file, hr, ftype=''):
+def open_file(file_path, output_time, file_type=''):
     """                                                                                  
-    open netCDF file using Xarray                                                        
+    open netCDF file using xarray
                                                                                          
                                                                                          
     Args:                                                                                
-      file (str): path to input file                                                     
-      hr (int): desired output time after start of forecast ('T+')                       
+      file_path (str): path to input file
+      output_time (int): desired output time after start of forecast ('T+')
       stream (str): string corresponding to input file ('pb', 'pc', etc)
 
     Kwargs:
-      ftype (str): 
+      file_type (str):
     """
 
     # read in multiple files (two different data streams)
     # 03/09/21 --> currently only set up for use with 4p4 MetUM data  
-    file_str = ['{0}{1}.nc'.format(file,'_pverc'), '{0}{1}.nc'.format(file,'_pverd')]
+    file_str = ['{0}{1}.nc'.format(file_path,'_pverc'), '{0}{1}.nc'.format(file_path,'_pverd')]
 
     # read in data using xarray
     # add capability to search for all files in this path, and open simultaneously
-    if ftype == '4p4':
+    if file_type == '4p4':
         data_pc = xr.open_dataset(file_str[0]).metpy.parse_cf()
         data_pd = xr.open_dataset(file_str[1]).metpy.parse_cf()
 
     # extract string beginning 'YYYYMMDD...' from file path string                       
-    date = file.split("/")[-1]
+    date = file_path.split("/")[-1]
     yr = date[0:4]; mn = date[4:6]; dy = date[6:8]; hh = date[9:11]
 
     # create datetime object corresponding to start of forecast using input information 
-    sstr = datetime.datetime(int(yr), int(mn), int(dy), int(hh))
+    start_fcst_str = datetime.datetime(int(yr), int(mn), int(dy), int(hh))
 
     # update datetime object to match the validity time                                  
-    tp = datetime.timedelta(hours=hr)
-    dstr = sstr + tp
+    tp = datetime.timedelta(hours=output_time)
+    date_str = start_fcst_str + tp
 
     # formatted strings for output file                                                   
-    tstr = dstr.strftime("%Y%m%dT%H00")
-    sstr = sstr.strftime("%Y%m%dT%H00Z")
+    tstr = date_str.strftime("%Y%m%dT%H00")
+    start_fcst_str = start_fcst_str.strftime("%Y%m%dT%H00Z")
 
-    if ftype == '4p4':
-        return sstr, dstr, tstr, data_pc, data_pd
+    if file_type == '4p4':
+        return start_fcst_str, date_str, tstr, data_pc, data_pd
     else:
-        return sstr, dstr, tstr
+        return start_fcst_str, date_str, tstr
 
 def subset(data, bounds, var='', vtime=[]):
     """                                                                                  
@@ -103,12 +103,12 @@ def subset(data, bounds, var='', vtime=[]):
     coords = data.coords.dims
     for c in coords:
         if c == 'p':
-            dset = '4p4'
+            dataset = '4p4'
         #elif c == 'level':
         elif c == 'isobaricInhPa':
-            dset = 'era5'
+            dataset = 'era5'
         elif c == 'hybrid_ht_1':
-            dset = 'n768'
+            dataset = 'n768'
 
     # use select function to subset data                                                 
     if var == 'circ':
