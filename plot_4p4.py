@@ -55,114 +55,15 @@ def main(inargs):
     # FUNCTION 6 --> general reading in of data
     else:
         if inargs.data == '4p4' or inargs.data == 'era5':
-            data = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
+            data_4p4 = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
+        elif inargs.data == 'era5':
+            data_era5 = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
         else: # inargs.data == 'n768' or inargs.data == 'sgt'
             data_n768, data_sgt = read_data(inargs.data, inargs.hr, inargs.sgt, bounds)
 
     # FUNCTION 7 --> interpolate N768 MetUM and SGT tool data onto specified levels
-
-    # N768 onto 4p4 
     if inargs.data == 'n768' or inargs.data == 'sgt':
-
-        # create new array of height levels 
-        ht_coords = np.arange(0, 17500, 250)
-        if inargs.hr == 0 or inargs.hr == 12: # T+0 and T+12 (data slightly different than other times)
-            ht_coords = gdata_pe.u['hybrid_ht'].data.astype('int32')
-            # interpolate onto new grid (horizontal and vertical) 
-            u_gl = gdata_pe.u.interp(hybrid_ht=ht_coords,
-                                     method="linear").assign_coords(height_levels=("hybrid_ht",
-                                    ht_coords)).swap_dims({"hybrid_ht":
-                                    "height_levels"})
-            v_gl = gdata_pe.v.interp(longitude_1=gdata_pe.u["longitude"],
-                                     latitude_1=gdata_pe.u["latitude"],
-                                     hybrid_ht=ht_coords,
-                                     method="linear").assign_coords(height_levels=("hybrid_ht",
-                                    ht_coords)).swap_dims({"hybrid_ht":
-                                                           "height_levels"})
-            pv_gl = gdata_pe.field83.interp(hybrid_ht_1=ht_coords,
-                                            method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                            ht_coords)).swap_dims({"hybrid_ht_1":
-                                                                   "height_levels"})
-            w_gl  = gdata_pe.dz_dt.interp(hybrid_ht_1=ht_coords,
-                                          method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                        ht_coords)).swap_dims({"hybrid_ht_1":
-                                                               "height_levels"})
-
-        else: # T+24 onwards 
-            ht_coords = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
-            # interpolate onto new grid (horizontal and vertical)
-            u_gl = gdata_pe.u.interp(longitude_1=gdata_pe.v["longitude"],
-                                     hybrid_ht_1=ht_coords,
-                                     method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                    ht_coords)).swap_dims({"hybrid_ht_1":
-                                    "height_levels"})
-            v_gl = gdata_pe.v.interp(latitude_1=gdata_pe.u["latitude"],
-                                     hybrid_ht_1=ht_coords,
-                                     method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                    ht_coords)).swap_dims({"hybrid_ht_1":
-                                                           "height_levels"})
-            pv_gl = gdata_pe.field83.interp(hybrid_ht=ht_coords,
-                                            method="linear").assign_coords(height_levels=("hybrid_ht",
-                                            ht_coords)).swap_dims({"hybrid_ht":
-                                                                   "height_levels"})
-            w_gl  = gdata_pe.dz_dt.interp(hybrid_ht=ht_coords,
-                                          method="linear").assign_coords(height_levels=("hybrid_ht",
-                                        ht_coords)).swap_dims({"hybrid_ht":
-                                                               "height_levels"})
-
-        if inargs.var != 'circ' and inargs.var != 'ubar':
-            q_gl  = gdata_pb.q.interp(hybrid_ht=ht_coords,
-                                      method="linear").assign_coords(height_levels=("hybrid_ht",
-                                        ht_coords)).swap_dims({"hybrid_ht":
-                                                               "height_levels"})
-            th_gl = gdata_pb.theta.interp(hybrid_ht=ht_coords,
-                                          method="linear").assign_coords(height_levels=("hybrid_ht",
-                                        ht_coords)).swap_dims({"hybrid_ht":
-                                                               "height_levels"})
-
-            q_gl = q_gl * 1000.; q_gl.attrs['units'] = 'g kg-1'
-
-        # SGT onto 4p4 (not for now)
-        if inargs.hr == 0 or inargs.hr == 12:
-            ht_sgt = gdata_pe.u['hybrid_ht'].data.astype('int32')
-        else:
-            ht_sgt = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
-
-        u_sgt = u_sgt.assign_coords(height_levels=("model_level_number",
-                                    ht_sgt)).swap_dims({"model_level_number":
-                                                        "height_levels"})
-        v_sgt = v_sgt.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-        w_sgt = w_sgt.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-        ug_sgt = ug_sgt.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-        vg_sgt = vg_sgt.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-        ug_um = ug_um.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-        vg_um = vg_um.assign_coords(height_levels=("model_level_number",
-                                    ht_coords)).swap_dims({"model_level_number":
-                                                           "height_levels"})
-
-        u_sgt = u_sgt.interp(height_levels=ht_coords,method="linear")
-        v_sgt = v_sgt.interp(height_levels=ht_coords,method="linear")
-        w_sgt = w_sgt.interp(height_levels=ht_coords,method="linear")
-        ug_sgt = ug_sgt.interp(height_levels=ht_coords,method="linear")
-        vg_sgt = vg_sgt.interp(height_levels=ht_coords,method="linear")
-        ug_um = ug_um.interp(height_levels=ht_coords,method="linear")
-        vg_um = vg_um.interp(height_levels=ht_coords,method="linear")
-
-        u_sgt.attrs['units'] = 'm/s'; v_sgt.attrs['units'] = 'm/s'; w_sgt.attrs['units'] = 'm/s'
-        ug_sgt.attrs['units'] = 'm/s'; vg_sgt.attrs['units'] = 'm/s'
-        ug_um.attrs['units'] = 'm/s'; vg_um.attrs['units'] = 'm/s'
-
-    
+        data_n768, data_sgt = interp_to_evenly_spaced_levels(data_n768, data_sgt)
 
     # ERA5 onto 4p4 (not for now)
     if inargs.data == 'era5':
@@ -1394,7 +1295,7 @@ def open_era5(validity_time):
     return era5
 
 
-def read_data(data_type, output_time, sgt_run):
+def read_data(data_type, output_time, sgt_run, bounds):
 
     METUM_4p4_PATH = f'/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld'
     ERA5_PATH = f'/nobackup/earshar/borneo/bv_oct2018.grib'
@@ -1402,7 +1303,7 @@ def read_data(data_type, output_time, sgt_run):
     METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa'
 
     if data_type == '4p4':
-        start_fcst_str, date_str, tstr, data_pc, data_pd = fp.open_file(METUM_4p4_PATH, output_time, ftype='4p4')
+        start_fcst_str, date_str, tstr, data_pc, data_pd = fp.open_file(METUM_4p4_PATH, output_time, file_type='4p4')
         data_4p4_pc = subset(data_pc, bounds, validity_time=date_str)
         data_4p4_pd = subset(data_pd, bounds, validity_time=date_str)
 
@@ -1411,7 +1312,7 @@ def read_data(data_type, output_time, sgt_run):
 
     elif data_type == 'era5':
         era5 = xr.open_dataset(ERA5_PATH, engine="cfgrib").metpy.parse_cf()
-        _, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, ftype='era5')
+        _, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, file_type='era5')
         data_era5 = subset(era5, bounds, validity_time=date_str)
 
     else: # data_type == 'sgt' or data_type == 'n768'
@@ -1425,7 +1326,7 @@ def read_data(data_type, output_time, sgt_run):
             else:
                 time_str = int(output_time)
 
-            start_fcst_str, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, ftype='sgt')
+            start_fcst_str, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, file_type='sgt')
             SGT_FILE_NAME = f'{SGT_TOOL_PATH}/OUT_{name}_{start_fcst_str}_T{Tp:03d}.nc'
             variabledict[name] = iris.load(SGT_FILE_NAME)[0]
             variabledict[name].rename(name)
@@ -1459,6 +1360,7 @@ def read_data(data_type, output_time, sgt_run):
         return data_era5
     else: # data_type == 'n768' or data_type == 'sgt'
         return data_n768, data_sgt
+
 
 def subset(data, bounds, validity_time=[]):
     """
@@ -1496,6 +1398,38 @@ def subset(data, bounds, validity_time=[]):
                         latitude=slice(bounds[2], bounds[3]))
 
     return data
+
+
+def interp_to_evenly_spaced_levels(data_n768, data_sgt):
+
+    # new_ht_levels = np.arange(0, 17500, 250)
+    new_ht_levels = data_n768.theta['hybrid_ht'].data.astype('int32')
+
+    data_n768 = data_n768.interp(hybrid_ht=new_ht_levels,
+                                 method="linear").assign_coords(height_levels=("hybrid_ht",
+                                    new_ht_levels)).swap_dims({"hybrid_ht":
+                                                               "height_levels"
+                                                       }
+                                    )
+
+    data_n768 = data_n768.interp(longitude_1=data_n768.theta["longitude"],
+                                 latitude_1=data_n768.theta["latitude"],
+                                 hybrid_ht_1=new_ht_levels,
+                                 method="linear").assign_coords(height_levels=("hybrid_ht_1",
+                                    new_ht_levels)).swap_dims({"hybrid_ht_1":
+                                                              "height_levels"
+                                                       }
+                                    )
+
+    var_names = {'u', 'v', 'w', 'ug', 'vg', 'ug_um', 'vg_um'}
+    for name in var_names:
+        data_sgt[name] = data_sgt[name].assign_coords(height_levels=("model_level_number",
+                                                new_ht_levels)).swap_dims({"model_level_number":
+                                                                           "height_levels"})
+        data_sgt[name] = data_sgt[name].interp(height_levels=new_ht_levels,method="linear")
+        data_sgt[name].attrs['units'] = 'm/s'
+
+    return data_n768, data_sgt
 
 
 if __name__ == '__main__':
