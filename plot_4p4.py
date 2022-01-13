@@ -63,7 +63,6 @@ def main(inargs):
 
     # FUNCTION 7 --> interpolate N768 MetUM and SGT tool data onto specified levels
     if inargs.data == 'n768' or inargs.data == 'sgt':
-        ### START FROM HERE
         data_n768, data_sgt = interp_to_evenly_spaced_levels(data_n768, data_sgt)
 
     # ERA5 onto 4p4 (not for now)
@@ -1403,8 +1402,8 @@ def subset(data, bounds, validity_time=[]):
 
 def interp_to_evenly_spaced_levels(data_n768, data_sgt):
 
-    new_ht_levels = np.arange(0, 17500, 250)
-    # new_ht_levels = data_n768.theta['hybrid_ht'].data.astype('int32')
+    # new_ht_levels = np.arange(0, 17500, 250)
+    new_ht_levels = data_n768.theta['hybrid_ht'].data.astype('int32')
 
     data_n768 = data_n768.interp(hybrid_ht=new_ht_levels,
                                  method="linear").assign_coords(height_levels=("hybrid_ht",
@@ -1422,51 +1421,13 @@ def interp_to_evenly_spaced_levels(data_n768, data_sgt):
                                                        }
                                     )
 
-    ### START FROM HERE
-
-    # SGT onto 4p4 (not for now)
-    if inargs.hr == 0 or inargs.hr == 12:
-        ht_sgt = gdata_pe.u['hybrid_ht'].data.astype('int32')
-    else:
-        ht_sgt = gdata_pe.u['hybrid_ht_1'].data.astype('int32')
-
-    u_sgt = u_sgt.assign_coords(height_levels=("model_level_number",
-                                               ht_sgt)).swap_dims({"model_level_number":
-                                                                       "height_levels"})
-    v_sgt = v_sgt.assign_coords(height_levels=("model_level_number",
-                                               new_ht_levels)).swap_dims({"model_level_number":
-                                                                          "height_levels"})
-    w_sgt = w_sgt.assign_coords(height_levels=("model_level_number",
-                                               ht_coords)).swap_dims({"model_level_number":
-                                                                          "height_levels"})
-    ug_sgt = ug_sgt.assign_coords(height_levels=("model_level_number",
-                                                 ht_coords)).swap_dims({"model_level_number":
-                                                                            "height_levels"})
-    vg_sgt = vg_sgt.assign_coords(height_levels=("model_level_number",
-                                                 ht_coords)).swap_dims({"model_level_number":
-                                                                            "height_levels"})
-    ug_um = ug_um.assign_coords(height_levels=("model_level_number",
-                                               ht_coords)).swap_dims({"model_level_number":
-                                                                          "height_levels"})
-    vg_um = vg_um.assign_coords(height_levels=("model_level_number",
-                                               ht_coords)).swap_dims({"model_level_number":
-                                                                          "height_levels"})
-
-    u_sgt = u_sgt.interp(height_levels=ht_coords, method="linear")
-    v_sgt = v_sgt.interp(height_levels=ht_coords, method="linear")
-    w_sgt = w_sgt.interp(height_levels=ht_coords, method="linear")
-    ug_sgt = ug_sgt.interp(height_levels=ht_coords, method="linear")
-    vg_sgt = vg_sgt.interp(height_levels=ht_coords, method="linear")
-    ug_um = ug_um.interp(height_levels=ht_coords, method="linear")
-    vg_um = vg_um.interp(height_levels=ht_coords, method="linear")
-
-    u_sgt.attrs['units'] = 'm/s';
-    v_sgt.attrs['units'] = 'm/s';
-    w_sgt.attrs['units'] = 'm/s'
-    ug_sgt.attrs['units'] = 'm/s';
-    vg_sgt.attrs['units'] = 'm/s'
-    ug_um.attrs['units'] = 'm/s';
-    vg_um.attrs['units'] = 'm/s'
+    var_names = {'u', 'v', 'w', 'ug', 'vg', 'ug_um', 'vg_um'}
+    for name in var_names:
+        data_sgt[name] = data_sgt[name].assign_coords(height_levels=("model_level_number",
+                                                new_ht_levels)).swap_dims({"model_level_number":
+                                                                           "height_levels"})
+        data_sgt[name] = data_sgt[name].interp(height_levels=new_ht_levels,method="linear")
+        data_sgt[name].attrs['units'] = 'm/s'
 
     return data_n768, data_sgt
 
