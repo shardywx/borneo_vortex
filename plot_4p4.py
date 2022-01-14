@@ -1327,7 +1327,7 @@ def read_data(data_type, output_time, sgt_run, bounds):
                 time_str = int(output_time)
 
             start_fcst_str, date_str, _ = fp.open_file(METUM_4p4_PATH, output_time, file_type='sgt')
-            SGT_FILE_NAME = f'{SGT_TOOL_PATH}/OUT_{name}_{start_fcst_str}_T{Tp:03d}.nc'
+            SGT_FILE_NAME = f'{SGT_TOOL_PATH}/OUT_{name}_{start_fcst_str}_T{time_str:03d}.nc'
             variabledict[name] = iris.load(SGT_FILE_NAME)[0]
             variabledict[name].rename(name)
             data_sgt[name] = xr.DataArray.from_iris(variabledict[name].extract(name)).sel(longitude=slice(bounds[0],
