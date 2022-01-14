@@ -65,6 +65,9 @@ def main(inargs):
     if inargs.data == 'n768' or inargs.data == 'sgt':
         data_n768, data_sgt = interp_to_evenly_spaced_levels(data_n768, data_sgt)
 
+    print(data_n768)
+    exit()
+
     # ERA5 onto 4p4 (not for now)
     if inargs.data == 'era5':
         u_era = era5.u; v_era = era5.v; w_era = era5.w
