@@ -1258,7 +1258,7 @@ def plot_circ_time_series(bounds, output_time, vortex_path):
 
     variable_str = 'Area-averaged relative vorticity'
     ax.set(xlabel='Time',
-           ylabel=f'{variable_str} ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)',
+           ylabel=r'{0} ($\mathregular{10}^{-6}$ s$\mathregular{^{-1}}$)'.format(variable_str),
            title=f'{variable_str} following the vortex')
     ax.grid(True)
     ax.legend(loc='upper left')
