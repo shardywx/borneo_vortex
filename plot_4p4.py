@@ -1251,7 +1251,7 @@ def plot_circ_time_series(bounds, output_time, vortex_path):
     circ_4p4 = fp.calc_circ(data_4p4_metum.u, data_4p4_metum.v, bv_lat, bv_lon, plev=800, r0=3.0)
     circ_n768 = fp.calc_circ(uwind, vwind, bv_lat, bv_lon, mlev=2000, r0=3.0)
 
-    fig, ax = plt.subplots(figsize=(10, 6)
+    fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(bv_time, circ_4p4, color='k', label='4.4 km MetUM')
     ax.plot(bv_time[4:21:2], circ_n768, color='b', label='Global MetUM')
     ax.plot(bv_time, circ_era5, color='r', label='ERA5 reanalysis')
