@@ -1280,7 +1280,7 @@ def read_n768_metum_heating(bounds, output_time):
 
     METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pc{time_str:03d}.nc'
 
-    data_n768_pc = xr.open_dataset(METUM_N768_PATH.drop_variables=['unspecified_5','unspecified_6',
+    data_n768_pc = xr.open_dataset(METUM_N768_PATH,drop_variables=['unspecified_5','unspecified_6',
                                                                    'unspecified_9','unspecified_10'])
     data_n768_pc = data_n768_pc.metpy.assign_crs(grid_mapping_name='latitude_longitude',
                                                  earth_radius=6371229.0).sel(longitude=slice(bounds[0], bounds[1]),
