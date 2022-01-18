@@ -1273,12 +1273,12 @@ def plot_circ_time_series(bounds, output_time, vortex_path):
 
 def read_n768_metum_heating(bounds, output_time):
 
-    METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pc{time_str:03d}.nc'
-
     if output_time == 0:
         time_str = int(output_time)
     else:
         time_str = int(output_time) - 12
+
+    METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pc{time_str:03d}.nc'
 
     data_n768_pc = xr.open_dataset(METUM_N768_PATH.drop_variables=['unspecified_5','unspecified_6',
                                                                    'unspecified_9','unspecified_10'])
