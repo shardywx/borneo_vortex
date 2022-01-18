@@ -47,11 +47,13 @@ def main(inargs):
         prcp_time_series_plot = plot_prcp_time_series(bounds, VORTEX_PATH, inargs.r0)
     # FUNCTION 5 --> calculate and plot vbar, ubar or circ
     elif inargs.var == 'ubar':
-        mean_uwind_plot = plot_mean_uwind(bounds, inargs.r0, date_str)
+        mean_uwind_plot = plot_mean_uwind(bounds, inargs.r0)
     elif inargs.var == 'node':
         mean_vwind_plot = plot_mean_vwind(bounds, inargs.r0, date_str)
     elif inargs.var == 'circ':
         circ_time_series_plot = plot_circ_time_series(bounds, inargs.hr, VORTEX_PATH)
+    elif inargs.var == 'heating':
+        total_heating_rate = read_n768_metum_heating(bounds, inargs.hr)
     # FUNCTION 6 --> general reading in of data
     else:
         if inargs.data == '4p4' or inargs.data == 'era5':
@@ -64,9 +66,6 @@ def main(inargs):
     # FUNCTION 7 --> interpolate N768 MetUM and SGT tool data onto specified levels
     if inargs.data == 'n768' or inargs.data == 'sgt':
         data_n768, data_sgt = interp_to_evenly_spaced_levels(data_n768, data_sgt)
-
-    print(data_n768)
-    exit()
 
     # ERA5 onto 4p4 (not for now)
     if inargs.data == 'era5':
@@ -1179,7 +1178,7 @@ def plot_mean_vwind(bounds, vortex_box_radius, date_str):
     return fig
 
 
-def plot_mean_uwind(bounds, vortex_box_radius, date_str):
+def plot_mean_uwind(bounds, vortex_box_radius):
 
     data_n768_metum = read_all_n768_metum(bounds)
     uwind = data_n768_metum.u
@@ -1270,6 +1269,30 @@ def plot_circ_time_series(bounds, output_time, vortex_path):
     fig.savefig(OUT_PATH, dpi=200)
 
     return fig
+
+
+def read_n768_metum_heating(bounds, output_time):
+
+    METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pc{time_str:03d}.nc'
+
+    if output_time == 0:
+        time_str = int(output_time)
+    else:
+        time_str = int(output_time) - 12
+
+    data_n768_pc = xr.open_dataset(METUM_N768_PATH.drop_variables=['unspecified_5','unspecified_6',
+                                                                   'unspecified_9','unspecified_10'])
+    data_n768_pc = data_n768_pc.metpy.assign_crs(grid_mapping_name='latitude_longitude',
+                                                 earth_radius=6371229.0).sel(longitude=slice(bounds[0], bounds[1]),
+                                                                             latitude=slice(bounds[2], bounds[3]))
+
+    heating_rate = 0
+    vars_list = ['unspecified', 'unspecified_1', 'unspecified_2', 'unspecified_3',
+                 'unspecified_4', 'unspecified_7','unspecified_8']
+    for var in vars_list:
+        heating_rate = heating_rate + data_n768_pc[var]
+
+    return heating_rate
 
 
 def read_all_n768_metum(bounds):
