@@ -6,7 +6,7 @@ import iris.quickplot as qplt
 import iris.analysis.maths as imath
 import iris.coords
 import matplotlib
-matplotlib.use('TkAgg')
+#matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import metpy.calc as mpcalc 
@@ -63,7 +63,7 @@ def cs_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane, mn):
         subset = iris.Constraint(latitude=lambda z: lat0<z<lat1,longitude=lambda z: lon0<z<lon1)
 
         # define variable dictionary (data structure that maps one value to another)
-        # print('Loading...') --> loading all output variables from the SGT model  
+        # print('Loading...') --> loading all output variables from the SGT tool  
         variabledict={}
         for name in output_names:  # import this information from 'diagnosticSGsetup'
                 print('   {}'.format(name))
@@ -105,23 +105,30 @@ def cs_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane, mn):
                 # geostrophic wind components
                 ug = variabledict['ug_um'][:]; vg = variabledict['vg_um'][:]
                 ug.units = 'm s**-1'; vg.units = 'm s**-1'
+                # calculate ageostrophic wind components 
+                uaa = ua - ug; vaa = va - vg
                 # calculate relative vorticity
                 if (var == 'vort'):
                         V  = VectorWind(ua, va); vort = V.vorticity()
                 # regrid output from SGT tool onto MetUM grid
                 ug = ug.regrid(ua,iris.analysis.Linear()); vg = vg.regrid(va,iris.analysis.Linear())
+                uaa = uaa.regrid(ua,iris.analysis.Linear()); vaa = vaa.regrid(va,iris.analysis.Linear())
 
         # read in 3D wind field from SGT tool
         else:
                 wa = variabledict['w'][:] * 100; wa.units = 'cm s**-1'
                 va = variabledict['v'][:]; ua = variabledict['u'][:]
-                V  = VectorWind(ua, va); vort = V.vorticity()
+                # can't calculate vorticity using this method, as it requires global data 
+                #V  = VectorWind(ua, va); vort = V.vorticity()
+
                 # calculate geostrophic and ageostrophic wind components
                 ug = variabledict['ug'][:]; vg = variabledict['vg'][:]
                 uaa = ua - ug; vaa = va - vg
                 # regrid onto MetUM grid 
-                ua = ua.regrid(ut0,iris.analysis.Linear()); va = va.regrid(ut0,iris.analysis.Linear())
-                wa = wa.regrid(ut0,iris.analysis.Linear()); vort = vort.regrid(ut0,iris.analysis.Linear())
+                ua=ua.regrid(ut0,iris.analysis.Linear()); va=va.regrid(ut0,iris.analysis.Linear())
+                wa=wa.regrid(ut0,iris.analysis.Linear())#; vort=vort.regrid(ut0,iris.analysis.Linear())
+                ug=ug.regrid(ut0,iris.analysis.Linear()); vg=vg.regrid(ut0,iris.analysis.Linear())
+                uaa=uaa.regrid(ut0,iris.analysis.Linear()); vaa=vaa.regrid(ut0,iris.analysis.Linear())
 
         # constrain further by focusing on single latitude / longitude
         if (Tp == 72):
@@ -140,30 +147,48 @@ def cs_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane, mn):
         cs0 = 'WE'
 
         # choose direction of cross-section
-        if (var == 'u'):
-                plane = 'lon'; xy_sub = lon_sub; xy_coord = 'latitude'
-        elif (var == 'v'):
-                plane = 'lat'; xy_sub = lat_sub; xy_coord = 'longitude'
+        if var == 'u' or var == 'ua':
+                plane = 'lon'; xy_sub = lon_sub; xy_coord = 'latitude'; cs0 = 'NS'
+        elif var == 'v' or var == 'va':
+                plane = 'lat'; xy_sub = lat_sub; xy_coord = 'longitude'; cs0 = 'WE'
         else: # var == 'rh' or 'q'
-                if (cs0 == 'WE'):
+                if cs0 == 'WE':
                         plane = 'lat'; xy_sub = lat_sub; xy_coord = 'longitude'
                 else:
                         plane = 'lon'; xy_sub = lon_sub; xy_coord = 'latitude'
 
-
         # narrow down further to single latitude / longitude
-        wa = wa.extract(xy_sub); va = va.extract(xy_sub); ua = ua.extract(xy_sub); pv0 = pv0.extract(xy_sub)
+        wa = wa.extract(xy_sub); va = va.extract(xy_sub); 
+        ua = ua.extract(xy_sub); pv0 = pv0.extract(xy_sub)
         th0 = th0.extract(xy_sub); rh0 = rh0.extract(xy_sub); q0 = q0.extract(xy_sub)
+        uaa = uaa.extract(xy_sub); vaa = vaa.extract(xy_sub)
+        ug = ug.extract(xy_sub); vg = vg.extract(xy_sub)
 
         # choose variable to plot 
         if (var == 'v'):
                 cs = va
                 dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl)
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
         elif (var == 'u'): 
                 cs = ua
                 dl = 1.0; vmin = -15.0; vmax = -vmin + dl
-                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl)
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
+        elif var == 'ua':
+                cs = uaa
+                dl = 1.0; vmin = -15.0; vmax = -vmin + dl
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
+        elif var == 'va':
+                cs = vaa
+                dl = 1.0; vmin = -15.0; vmax = -vmin + dl
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
+        elif var == 'ug':
+                cs = ug
+                dl = 1.0; vmin = -15.0; vmax = -vmin + dl
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
+        elif var == 'vg':
+                cs = vg
+                dl = 1.0; vmin = -15.0; vmax = -vmin + dl
+                Cmap, norm, levs = normalise_cmap(vmin,vmax,0,dl,'RdBu_r')
         elif (var == 'rh'):
                 cs = rh0
                 dl = 5.0; rmin = 40.0; rmax = 100.0
@@ -182,19 +207,21 @@ def cs_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane, mn):
         elif (var == 'w'):
                 cs = wa
                 dl = 5.0; wmin = -20.0; wmax = -wmin + dl
-                Cmap, norm, levs = normalise_cmap(wmin,wmax,0,dl)
+                Cmap, norm, levs = normalise_cmap(wmin,wmax,0,dl,'bwr')
         else: # var == 'vort'
                 vort = vort.extract(subset & ht_sub & xy_sub); vort = vort * 100000
                 cs = vort; levs = np.arange(-10., 10., 1.0); Cmap = 'RdBu_r'
 
         # set up cross-section to cover small region
-        cf = iplt.contourf(cs, coords=[xy_coord, 'level_height'], levels=levs, cmap=Cmap)
-        #cf = iplt.contourf(cs, coords=[xy_coord, 'level_height'], cmap='BuPu')
+        if md == 'um':
+                cf = iplt.contourf(cs, coords=[xy_coord, 'level_height'], levels=levs, cmap=Cmap)
+        else: # SGT 
+                cf = iplt.contourf(cs, coords=[xy_coord, 'model_level_number'], levels=levs, cmap=Cmap)
 
         # overlay line contours of theta
-        contours = iplt.contour(th0, coords=[xy_coord, 'level_height'], 
-                                levels=np.arange(200, 440, 2), colors='black')
-        plt.clabel(contours, inline=True, fontsize=8)
+#        contours = iplt.contour(th0, coords=[xy_coord, 'level_height'], 
+#                                levels=np.arange(200, 440, 2), colors='black')
+#        plt.clabel(contours, inline=True, fontsize=8)
 
         '''
         # overlay selected vertical velocity contours 
@@ -213,9 +240,11 @@ def cs_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane, mn):
         # produce output plot 
         if (md == 'sgt'):
                 if (plane == 'lon'):
-                        fili_cs = './{1}_sgt_{2}_cs_{4}{5}_{3}_T{0}.{6}'.format(Tp,res,sim,var,plane,ln,out)
+                        fili_cs = './{1}_sgt_{2}_cs_{4}{5}_{3}_T{0}.{6}'.format(Tp,res,sim,var,
+                                                                                plane,ln,out)
                 else:
-                        fili_cs = './{1}_sgt_{2}_cs_{4}{5}_{3}_T{0}.{6}'.format(Tp,res,sim,var,plane,lt,out)
+                        fili_cs = './{1}_sgt_{2}_cs_{4}{5}_{3}_T{0}.{6}'.format(Tp,res,sim,var,
+                                                                                plane,lt,out)
         else:
                 if (plane == 'lon'):
                         fili_cs = './{1}_metum_control_cs_{4}{5}_{3}_T{0}.{6}'.format(Tp,res,sim,

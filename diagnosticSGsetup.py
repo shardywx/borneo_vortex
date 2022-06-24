@@ -88,7 +88,7 @@ def diagnosticSGsetup(fnames, ddir, fcst, Tp, orog_fn=None):
       cubes = cubes.extract(tcon)
     else:
       cubes = iris.load(fnames, constraints=tcon)
-    
+
     '''
     Extract what's needed - load and regrid one at a time 
     Get memory for N768 data if we try and load all at once 

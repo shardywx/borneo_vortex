@@ -65,7 +65,7 @@ def diagnostic_interface(ddir, fcst, Tp):
 
 	# Set switches for use of moist stability and artificial heating
 	cloud = 0
-	heating = 1
+	heating = 0
 	if cloud > 0:
 		lcl = variabledict['lcl'].data
 		nx = sw.shape[2]
@@ -80,8 +80,8 @@ def diagnostic_interface(ddir, fcst, Tp):
 		uinc = gwu
 		vinc = gwv
 	else:
-		tinc = bl + sw + lw + PC2 + lsp + con + gwt
-		#tinc = np.zeros( (nlev, ny, nx) )
+		#tinc = bl + sw + lw + PC2 + lsp + con + gwt
+		tinc = np.zeros( (nlev, ny, nx) )
 		uinc = cmtu + gwu
 		vinc = cmtv + gwv
 

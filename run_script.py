@@ -1,9 +1,9 @@
 import sys
+import glob
 from diagnosticSGsetup import diagnosticSGsetup
 from diagnostic_interface import diagnostic_interface
 from diagnostic_plotter import diagnostic_plotter
 from cs_plotter import cs_plotter
-#from cs_plotter_metpy import cs_plotter_metpy
 from hov_plotter import hov_plotter
 from prcp_plotter import prcp_plotter
 

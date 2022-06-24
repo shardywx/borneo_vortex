@@ -671,10 +671,10 @@ def diagnostic_core(exner_cube, theta_cube, thetavd_cube, rhod_cube,
     dugdt_cube = SG.newcube(dugdt, exner_cube)
     dvgdt_cube = SG.newcube(dvgdt, exner_cube)
     dthetavdt_cube = SG.newcube(dthetavdt, exner_cube)
-    '''                                                                                                               
-    calculate updated, balanced geotriptic wind components                                                            
-    is 'u' here the geotriptic wind, and 'ug' the geostrophic wind?                                                   
-    or, is this the equivalent of updating the value of 'u' after the time-step?                                      
+    '''
+    calculate updated, balanced geotriptic wind components
+    is 'u' here the geotriptic wind, and 'ug' the geostrophic wind?
+    or, is this the equivalent of updating the value of 'u' after the time-step?
     '''
     u = u + ug
     v = v + vg
@@ -685,7 +685,7 @@ def diagnostic_core(exner_cube, theta_cube, thetavd_cube, rhod_cube,
     ug_um_cube = SG.newcube(ug_um, exner_cube)
     vg_um_cube = SG.newcube(vg_um, exner_cube)
     # also output boundary layer height (10/11/20)
-    exner_slice = exner_cube.extract(iris.Constraint(model_level_number=1))                                     
+    exner_slice = exner_cube.extract(iris.Constraint(model_level_number=1))
     blh_cube    = SG.newcube2d(BLH, exner_slice)
     # additional outputs if cloud=2, these are zero if cloud=0.
     balheat1=w*(drystability-Q33)*thetav/g

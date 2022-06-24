@@ -39,6 +39,10 @@ def main(inargs):
     bounds = define_plot_bounds(inargs.plot_type)
 
 
+    # create date string using existing function --> need a less messy way of doing this
+    METUM_4p4_PATH = '/nobackup/earshar/borneo/20181021T1200Z_SEA4_km4p4_ra1tld'
+    _, date_str, _, _, _ = fp.open_file(METUM_4p4_PATH, inargs.hr, file_type='4p4')
+
     # FUNCTION 3 --> plot Himawari brightness temperature data
     if inargs.var == 'hima':
         himawari_plot = plot_t_bright_himawari(date_str, bounds, VORTEX_PATH)
@@ -436,25 +440,22 @@ def main(inargs):
 
             # first file contains 2 times --> select single time 
             if inargs.hr == 0 or inargs.hr == 12:
-                u_gl = u_gl.sel(t=dstr); v_gl = v_gl.sel(t=dstr); w_gl = w_gl.sel(t=dstr)
-                pv_gl = pv_gl.sel(t=dstr) * 1000000.
-                q_gl = q_gl.sel(t=dstr) / 1000.; q_gl.attrs['units'] = 'kg kg-1'
-                th_gl = th_gl.sel(t=dstr)
-                # interpolate PV and vertical velocity onto u,v grid 
-                pv_gl = pv_gl.interp(longitude_1=u_gl["longitude"],
-                                     latitude=u_gl["latitude"],method="linear")
-                w_gl  = w_gl.interp(longitude_1=u_gl["longitude"],
-                                    latitude=u_gl["latitude"],method="linear")
-            # remove unnecessary (time) dimension 
+                u_gl = data_n768.u.sel(t=date_str)
+                v_gl = data_n768.v.sel(t=date_str)
+                w_gl = data_n768.dz_dt.sel(t=date_str)
+                pv_gl = data_n768.field83.sel(t=date_str) * 1000000.
+                q_gl = data_n768.q.sel(t=date_str) / 1000.; q_gl.attrs['units'] = 'kg kg-1'
+                th_gl = data_n768.theta.sel(t=date_str)
+
             else:
-                w_gl = w_gl.squeeze('t'); u_gl = u_gl.squeeze('t'); v_gl = v_gl.squeeze('t')
-                pv_gl = pv_gl.squeeze('t') * 1000000.; q_gl.attrs['units'] = 'kg kg-1'
-                q_gl = q_gl.squeeze('t') / 1000.; q_gl.attrs['units'] = 'kg kg-1'
-                th_gl = th_gl.squeeze('t')
+                w_gl = data_n768.dz_dt; u_gl = data_n768.u; v_gl = data_n768.v
+                pv_gl = data_n768.field83 * 1000000.
+                q_gl = data_n768.q / 1000.; q_gl.attrs['units'] = 'kg kg-1'
+                th_gl = data_n768.theta
 
             # interpolate geostrophic wind components (from SGT tool) onto N768 grid 
-            ug_gl = ug_um.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
-            vg_gl = vg_um.interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
+            ug_gl = data_sgt['ug_um'].interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
+            vg_gl = data_sgt['vg_um'].interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
 
             # geostrophic and ageostrophic wind components
             ua_gl = u_gl - ug_gl; va_gl = v_gl - vg_gl
@@ -463,11 +464,11 @@ def main(inargs):
             if inargs.plane == 'ns':
                 th = th_gl.sel(longitude=start[1], method="nearest")
                 th_cs = th.sel(latitude=slice(start[0],end[0]),
-                               height_levels=slice(50, 13500) )
+                               height_levels=slice(50, 15000) )
             else:
                 th = th_gl.sel(latitude=start[0], method="nearest")
                 th_cs = th.sel(longitude=slice(start[1],end[1]),
-                               height_levels=slice(50, 13500) )
+                               height_levels=slice(50, 15000) )
 
             # calculate static stability
             # LOOK INTO THIS PART OF THE CODE (dimensions are wrong for the line below)
@@ -477,15 +478,12 @@ def main(inargs):
             # now calculate effective PV gradient (q / N^2)
             pv_grad = (q_gl / th_dz) #/ 10000.
 
-            ### SGT tool ### 
-            w_sg = w_sgt * 100.; u_sg = u_sgt; v_sg = v_sgt; ug_sg = ug_sgt; vg_sg = vg_sgt
-
             # interpolate to N768 grid 
-            u_sg = u_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
-            v_sg = v_sg.interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
-            w_sg = w_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
-            ug_sg = ug_sg.interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
-            vg_sg = vg_sg.interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
+            u_sg = data_sgt['u'].interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
+            v_sg = data_sgt['v'].interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
+            w_sg = data_sgt['w'].interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear") * 100.
+            ug_sg = data_sgt['ug'].interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
+            vg_sg = data_sgt['vg'].interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
 
             # calculate ageostrophic wind components (SGT tool)
             ua_sg = u_sg - ug_sg; va_sg = v_sg - vg_sg 
@@ -499,17 +497,17 @@ def main(inargs):
             if inargs.plane == 'ns':
                 w = w_sg.sel(longitude=start[1], method="nearest")
                 w_cs = w.sel(latitude=slice(start[0],end[0]),
-                             height_levels=slice(50, 13500) )
+                             height_levels=slice(50, 15000) )
                 v = v_sg.sel(longitude=start[1], method="nearest")
                 v_cs = v.sel(latitude=slice(start[0],end[0]),
-                             height_levels=slice(50, 13500) )
+                             height_levels=slice(50, 15000) )
             else:
                 w = w_sg.sel(latitude=start[0], method="nearest")
                 w_cs = w.sel(longitude=slice(start[1],end[1]),
-                             height_levels=slice(50, 13500) )
+                             height_levels=slice(50, 15000) )
                 v = v_sg.sel(latitude=start[0], method="nearest")
                 v_cs = v.sel(longitude=slice(start[1],end[1]),
-                             height_levels=slice(50, 13500) )
+                             height_levels=slice(50, 15000) )
 
         # FUNCTION 18 --> produce xz plot using chosen dataset and variable 
 
@@ -597,11 +595,11 @@ def main(inargs):
                 if inargs.plane == 'ns':
                     arr = pv_grad.sel(longitude=start[1], method="nearest")
                     arr = arr.sel(latitude=slice(start[0],end[0]),
-                                  height_levels=slice(50, 13500) )
+                                  height_levels=slice(50, 15000) )
                 else:
                     arr = pv_grad.sel(latitude=start[0], method="nearest")
                     arr = arr.sel(longitude=slice(start[1],end[1]),
-                                  height_levels=slice(50, 13500) )
+                                  height_levels=slice(50, 15000) )
                     dl = 5.0; qmin = 0.0; qmax = 100.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
                     cb_label=r'$q/N^2\,(s^{-2})$'
             elif inargs.data == '4p4':
@@ -864,7 +862,7 @@ def main(inargs):
         # FUNCTION 19 --> interpolate to new levels before plotting 
 
         # interpolate to new levels straight before plotting (troubleshooting)
-        ht_coords = np.arange(0, 13500, 250)
+        ht_coords = np.arange(0, 15000, 250)
         prs_coords = np.arange(1000, 100, -50)
 
         if inargs.data != '4p4':
@@ -1186,32 +1184,40 @@ def plot_mean_uwind(bounds, vortex_box_radius):
     n768_ht_coords = uwind['hybrid_ht_1'].data.astype('int32')
 
     # interpolate to new longitude grid and rename height coordinate
+    uwind = uwind.interp(hybrid_ht=n768_ht_coords,
+                         method="linear").assign_coords(height_levels=("hybrid_ht",
+                                                        n768_ht_coords)).swap_dims({"hybrid_ht":
+                                                                                    "height_levels"})
+
     uwind = uwind.interp(longitude_1=vwind["longitude"],
                          method="linear").assign_coords(height_levels=("hybrid_ht_1",
-                                                                      n768_ht_coords)).swap_dims({"hybrid_ht_1":
-                                                                                                 "height_levels"})
+                                                        n768_ht_coords)).swap_dims({"hybrid_ht_1":
+                                                                                    "height_levels"})
 
     mean_uwind = uwind.sel(longitude=slice(95.0, 120.0),
-                           latitude=slice(0.0, 15.0)).mean(dim=['longitude', 't']).sel(height_levels=slice(50, 15000))
+                           latitude=slice(0.0, 15.0)).mean(dim=['longitude', 't']).sel(height_levels=slice(10, 15000))
+
+    # START FROM HERE ('interp' function causing issues, both with height and latitude)
     n768_ht_coords = np.arange(0, 15000, 250)
     mean_uwind = mean_uwind.interp(height_levels=n768_ht_coords, method="linear")
 
-    lat_dimension_subset = np.arange(np.rint(arr.latitude[0].data),
-                                     np.rint(arr.latitude[-1].data) + 0.25, 0.25)
+    lat_dimension_subset = np.arange(np.rint(mean_uwind.latitude[0].data),
+                                     np.rint(mean_uwind.latitude[-1].data) + 0.25, 0.25)
     mean_uwind = mean_uwind.interp(latitude=lat_dimension_subset, method="linear")
-
 
     dl = 1.0; vmin = -20.0; vmax = -vmin + dl
     Colourmap, _, Levels = normalise_cmap(vmin, vmax, 0, dl, 'bwr')
-    colourbar_label = 'Mean zonal wind (m s-1)'
+    colourbar_label = r'Mean zonal wind $\mathregular{(m\,s^{-1})}$'
 
+    ht_coords = np.arange(0, 13500, 250)
+    mean_uwind = mean_uwind.interp(height_levels=ht_coords,method="linear")
 
     fig, ax = plt.subplots(figsize=(10, 6))
     mean_uwind_plot = plt.contourf(mean_uwind, levels=Levels, extend='max', cmap=Colourmap)
     mean_uwind_cbar = fig.colorbar(mean_uwind_plot)
 
 
-    lat0, lat1 = np.rint([arr.latitude[0].data, arr.latitude[-1].data])
+    lat0, lat1 = np.rint([mean_uwind.latitude[0].data, mean_uwind.latitude[-1].data])
     mean_uwind_lat_size = len(mean_uwind.latitude)
 
     ax.set_xlabel('Latitude (degrees north)')
@@ -1304,8 +1310,6 @@ def read_all_n768_metum(bounds):
                                           longitude_1=slice(bounds[0], bounds[1]),
                                           latitude_1=slice(bounds[2], bounds[3])
                                           )
-
-    # u_gl=gdata_pe.u; v_gl=gdata_pe.v; w_gl=gdata_pe.dz_dt; pv_gl=gdata_pe.field83
 
     return data_n768_metum
 
@@ -1447,6 +1451,7 @@ def interp_to_evenly_spaced_levels(data_n768, data_sgt):
                                                        }
                                     )
 
+    new_ht_levels = np.arange(0, 17500, 250)
     var_names = {'u', 'v', 'w', 'ug', 'vg', 'ug_um', 'vg_um'}
     for name in var_names:
         data_sgt[name] = data_sgt[name].assign_coords(height_levels=("model_level_number",

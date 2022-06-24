@@ -5,7 +5,7 @@ import iris.plot as iplt
 import iris.quickplot as qplt
 import iris.analysis.maths as imath
 import matplotlib
-matplotlib.use('TkAgg')
+#matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cartopy.feature as cfeature
@@ -83,13 +83,13 @@ def hov_plotter(ddir, sim, md, var, out, mn):
 
         # load in SGT tool data (clunky)
         level = iris.Constraint(model_level_number=14)
-        fili_ug = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_ug_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_vg = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_vg_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_u  = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_u_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_v  = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_v_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_w  = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_w_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_um_u = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_ug_um_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
-        fili_um_v = '{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_vg_um_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_ug='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_ug_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_vg='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_vg_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_u='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_u_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_v='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_v_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_w='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_w_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_um_u='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_ug_um_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
+        fili_um_v='{0}/SGTool/N768/{1}/{2}/filter_4_8/conv_g7x_v5/OUT_vg_um_20181021T1200Z_T*.nc'.format(ddir,mn,sim)
         ug = iris.load(fili_ug,level); vg = iris.load(fili_vg,level); u = iris.load(fili_u,level); v = iris.load(fili_v,level)
         ug_um = iris.load(fili_um_u,level); vg_um = iris.load(fili_um_v,level); w = iris.load(fili_w,level)
  
@@ -110,7 +110,8 @@ def hov_plotter(ddir, sim, md, var, out, mn):
 
         # extract data only for October (for Hovmoller)
         #pdt1 = PartialDateTime(year=2018, month=10, day=15); pdt2 = PartialDateTime(year=2018, month=11, day=6)
-        pdt1 = PartialDateTime(year=2018, month=10, day=22, hour=12); pdt2 = PartialDateTime(year=2018, month=10, day=26, hour=18)
+        pdt1 = PartialDateTime(year=2018, month=10, day=22, hour=12)
+        pdt2 = PartialDateTime(year=2018, month=10, day=26, hour=18)
         hov_time = iris.Constraint(time=lambda t: pdt1 <= t.point < pdt2)
         r1_ut = r1_ut.extract(hov_time); r1_vt = r1_vt.extract(hov_time)
         wm_ut = wm_ut.extract(hov_time); wm_vt = wm_vt.extract(hov_time)

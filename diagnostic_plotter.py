@@ -5,10 +5,11 @@ import iris.plot as iplt
 import iris.quickplot as qplt
 import iris.analysis.maths as imath
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import pandas as pd 
+import xarray as xr
 import diagnosticSGfunctions as SG
 
 from general_eqns import vorticity
@@ -75,27 +76,32 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
         print('\n======= Running diagnostic_plotter for {0} T+{1}'.format(fcst, Tp))
 
         # define variable dictionary (data structure that maps one value to another)
-	# print('Loading...') --> loading all output variables from the SGT model 
+	# print('Loading...') --> loading all output variables from the SGT tool
         variabledict={}
         for name in output_names:  # import this information from 'diagnosticSGsetup'
-                print('   {}'.format(name))
-                fn = '{0}/SGTool/{4}/{5}/{6}/filter_4_8/conv_g7x_v5/OUT_{1}_{2}_T{3:03d}.nc'.format(ddir,name,fcst,Tp,res,mn,sim)
+                var_name='{}'.format(name)
+                print(var_name)
+                fn = '{0}/SGTool/{4}/{5}/{6}/filter_4_8/conv_g7x_v5/OUT_{1}_{2}_T{3:03d}.nc'.format(ddir,name,
+                                                                                                    fcst,Tp,res,
+                                                                                                    mn,sim)
                 variabledict[name] = iris.load(fn)[0]
                 variabledict[name].rename(name)
 
         # define grid subset to reduce memory required to run script 
         if fcst == '20181021T1200Z' or fcst == '20181211T1200Z':
                 if (size == 'zoom'):
-                        lon0 = 101; lon1 = 119; lat0 = 1; lat1 = 14;
+                        #lon0 = 101; lon1 = 119; lat0 = 1; lat1 = 14
+                        lon0 = 93; lon1 = 123; lat0 = -3; lat1 = 20
                         #lon0 = 142; lon1 = 162; lat0 = 3; lat1 = 18;
                 elif (size == 'ext'):
-                        lon0 = 76; lon1 = 160; lat0 = -12; lat1 = 50;
-                        lon0 = 76; lon1 = 179; lat0 = -15; lat1 = 55;
+                        lon0 = 75; lon1 = 155; lat0 = -15; lat1 = 45;
+                        # lon0 = 76; lon1 = 179; lat0 = -15; lat1 = 55;
                 else: # reg
                         if var == 'prcp':
                                 lon0 = 91; lon1 = 139; lat0 = -14; lat1 = 24;
                         else:
-                                lon0 = 91; lon1 = 159; lat0 = -14; lat1 = 25;
+                                lon0 = 93; lon1 = 123; lat0 = -3; lat1 = 20
+                                #lon0 = 91; lon1 = 159; lat0 = -14; lat1 = 25;
         else:
                 lon0 = -60; lon1 = 0; lat0 = 30; lat1 = 70; 
 
@@ -108,7 +114,8 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
         mdiri  = '/nobackup/earshar/borneo'
         mfili  = '{0}/op_gl_um_2018octnov_mean.nc'.format(mdiri)
         mcubes = iris.load(mfili)
-        mean_u = mcubes.extract_strict('eastward_wind'); mean_v = mcubes.extract_strict('northward_wind')
+        mean_u = mcubes.extract_strict('eastward_wind')
+        mean_v = mcubes.extract_strict('northward_wind')
 
         # read in waves data (Kelvin, R1, WMRG waves)
         k_fili = '{0}/uz_Kelvin_rm_clim_6h_k2-40_p2-30_2018.nc'.format(mdiri)
@@ -119,11 +126,8 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
 	# plot filled contours (w, vort, ...)
         if (var == 'blh'):
                 levs = [14]
-        elif var == 'w':
-                levs = [12]
         else:
-                #levs = [4,8,14,24]
-                levs = [12]
+                levs = [18,21,24]#,23,24,25,26,27,28,29,30]
 
 	# loop over vertical levels
         for lev in levs:
@@ -133,6 +137,9 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 cubes = iris.load(fnames)
                 pv = cubes.extract_strict('potential_vorticity_of_atmosphere_layer')[lev,:,:]
                 pv.rename('PV'); pv.units = '1e6 PVU'; pv.convert_units('PVU')
+
+                # retrieve sigma information
+                sigma = cubes.extract_strict('potential_vorticity_of_atmosphere_layer').coord('sigma')
 
                 # also read in horizontal and vertical wind components from MetUM files
                 wt = cubes.extract_strict('upward_air_velocity')[lev,:,:]
@@ -269,18 +276,21 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         prcp = prcp * 900
                 prcp.units = 'mm hr**-1'
                 # focus on subset of times  
-                # EDIT FROM HERE --> MetUM precip data look strange, even though max/min are sensible
+                # EDIT --> MetUM precip data look strange, even though max/min are sensible
                 um_time = iris.Constraint(time = lambda t0: pdt1 <= t0.point <= pdt2)
                 prcp = prcp.extract(um_time) 
                 # calculate accumulated precipitation 
-                prcp = prcp.collapsed('time', iris.analysis.SUM); prcp.rename('accumulated rainfall')
+                prcp = prcp.collapsed('time', iris.analysis.SUM)
+                prcp.rename('accumulated rainfall')
 
                 # also read in 'pb' stream data
                 bnames = '{0}/case_{3}_{2}/umglaa_pb{1:03d}'.format(ddir, Tp-12, res, fcst)
                 cubes  = iris.load(bnames)
+
                 th0 = cubes.extract_strict('air_potential_temperature')[lev,:,:]
                 rh0 = cubes.extract_strict('relative_humidity')[lev,:,:]
                 q0  = cubes.extract_strict('specific_humidity')[lev,:,:]
+                rho = cubes.extract_strict('air_density')[lev,:,:]
 
                 # regrid 'u' onto 'v' grid 
                 ut = ut.regrid(vt,iris.analysis.Linear())
@@ -332,14 +342,14 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         V  = VectorWind(ua, va); vort = V.vorticity() * 100000
                         vort.rename('relative_vorticity')
                         vort.units = '10-5 s**-1'
-                        
-                        # regrid variables onto SGT grid (test)
-                        wa=wa.regrid(ug,iris.analysis.Linear())
-                        va=va.regrid(ug,iris.analysis.Linear())
-                        ua=ua.regrid(ug,iris.analysis.Linear())
-                        vort=vort.regrid(ug,iris.analysis.Linear())
 
-                        # regrid output from SGT model onto MetUM grid
+                        # regrid variables onto SGT grid (test)
+                        wa = wa.regrid(ug,iris.analysis.Linear())
+                        va = va.regrid(ug,iris.analysis.Linear())
+                        ua = ua.regrid(ug,iris.analysis.Linear())
+                        vort = vort.regrid(ug,iris.analysis.Linear())
+
+                        # regrid output from SGT tool onto MetUM grid
                         #ug = ug.regrid(ua,iris.analysis.Linear())
                         #vg = vg.regrid(va,iris.analysis.Linear())
 
@@ -348,7 +358,7 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         # add metadata
                         uaa.rename('ageostrophic_wind_ucomp'); vaa.rename('ageostrophic_wind_vcomp')
                         
-                # read in 3D wind field from SGT model 
+                # read in 3D wind field from SGT tool 
                 elif (md == 'sgt'):
                         va = variabledict['v'][lev]; ua = variabledict['u'][lev]
                         wa = variabledict['w'][lev] * 100
@@ -363,6 +373,9 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         uaa = ua - ug; vaa = va - vg
                         # boundary layer height (index)
                         blh_ind = variabledict['blh']
+                        # balanced heating 
+                        heat1 = variabledict['balheat1']
+                        heat2 = variabledict['balheat2']
                         '''
                         # regrid onto MetUM grid 
                         ua = ua.regrid(ut,iris.analysis.Linear())
@@ -379,11 +392,11 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         v_sg = variabledict['v'][lev]; u_sg = variabledict['u'][lev]
                         w_sg = variabledict['w'][lev]
                         u_sg.units = 'm s**-1'; v_sg.units = 'm s**-1'; w_sg.units = 'm s**-1'
-                        # regrid SGT model output onto MetUM grid 
+                        # regrid SGT tool output onto MetUM grid 
                         u_sg = u_sg.regrid(ut,iris.analysis.Linear()); 
                         v_sg = v_sg.regrid(vt,iris.analysis.Linear())
                         w_sg = w_sg.regrid(wt,iris.analysis.Linear())
-                        # calculate speed (SGT model)
+                        # calculate speed (SGT tool)
                         spd_sg = (u_sg * u_sg + v_sg * v_sg) ** 0.5
                         # calculate speed (MetUM)
                         spd_um = (ut * ut + vt * vt) ** 0.5
@@ -398,32 +411,43 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         # add code to plot geostrophic and ageostrophic wind components (14/10/20)
                         '''
 
-                # define lat/lon grids (both MetUM and SGT model)
+                # define lat/lon grids (both MetUM and SGT tool)
                 x0 = ua.coord('longitude').points; y0 = ua.coord('latitude').points
 
                 # add options for vorticity on pressure levels (filled contours)
                 dl = 1; vrtmin = -20; vrtmax = -vrtmin + dl
-                Cmap_vort, norm_vort, vortLevels = normalise_cmap(vrtmin,vrtmax,0,dl)
+                Cmap_vort, norm_vort, vortLevels = normalise_cmap(vrtmin,vrtmax,0,dl,'bwr')
+                cb_label = r'Relative vorticity $\mathregular{(s^{-1})}$'
 
                 # difference (relative vorticity)
                 dl_dv = 3; dvmin = -24; dvmax = -dvmin + dl_dv
-                Cmap_dv, norm_dv, dvLevels = normalise_cmap(dvmin,dvmax,0,dl_dv)
+                Cmap_dv, norm_dv, dvLevels = normalise_cmap(dvmin,dvmax,0,dl_dv,'bwr')
+                cb_label = r'Relative vorticity $\mathregular{(s^{-1})}$'
 
                 # same for horizontal wind 
-                dl_v = 4; spdmin = -40; spdmax = -spdmin + dl_v
-                Cmap_spd, norm_spd, spdLevels = normalise_cmap(spdmin,spdmax,0,dl_v)
+                dl_v = 2; spdmin = -30; spdmax = -spdmin + dl_v
+                Cmap_spd, norm_spd, spdLevels = normalise_cmap(spdmin,spdmax,0,dl_v,'bwr')
+                cb_label = r'Horizontal wind $\mathregular{(m\,s^{-1})}$'
+
+                # ageostrophic wind (SGT tool)
+                dl_ua = 1; uamin = -15; uamax = -uamin + dl_ua
+                Cmap_ua, norm_ua, uaLevels = normalise_cmap(uamin,uamax,0,dl_ua,'bwr') 
+                cb_label = r'Ageostrophic wind $\mathregular{(m\,s^{-1})}$'
 
                 # difference (horizontal wind)
                 dl_diff = 2; diffmin = -20; diffmax = -diffmin + dl_diff
-                Cmap_diff, norm_diff, diffLevels = normalise_cmap(diffmin,diffmax,0,dl_diff)
+                Cmap_diff, norm_diff, diffLevels = normalise_cmap(diffmin,diffmax,0,dl_diff,'bwr')
+                cb_label = r'Horizontal wind $\mathregular{(m\,s^{-1})}$'
 
                 # contour levels for time-mean wind 
                 dl = 1; v_min = -10; v_max = -v_min + dl
-                Cmap_v, norm_v, vLevels = normalise_cmap(v_min,v_max,0,dl)
+                Cmap_v, norm_v, vLevels = normalise_cmap(v_min,v_max,0,dl,'bwr')
+                cb_label = r'Time-mean wind $\mathregular{(m\,s^{-1})}$'
                 
-                # create colour scale for vertical velocity too 
-                dl_w = 0.25; wmin = -18.0; wmax = -wmin + dl_w
-                Cmap_w, norm_w, wLevels = normalise_cmap(wmin,wmax,0,dl_w)
+                # create colour scale for vertical velocity 
+                dl_w = 0.25; wmin = -15.0; wmax = -wmin + dl_w
+                Cmap_w, norm_w, wLevels = normalise_cmap(wmin,wmax,0,dl_w,'bwr')
+                cb_label = r'Vertical velocity $\mathregular{(cm\,s^{-1})}$'
 
                 # calculate circulation around vortex, if required
                 if (var == 'circ'):
@@ -439,7 +463,8 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 elif (var == 'vort'):
                         print('Starting contour plotting...')
                         if (md == 'diff'):
-                                cf = iplt.contourf(vort[:, :], axes=ax, levels=dvLevels, cmap=Cmap_dv)
+                                cf = iplt.contourf(vort[:, :], axes=ax, levels=dvLevels, 
+                                                   cmap=Cmap_dv)
                         elif (md == 'sgt'):
                                 cf = iplt.contourf(vort[:, :], axes=ax, 
                                                    levels=vortLevels, cmap=Cmap_vort)
@@ -456,9 +481,9 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                                                            levels=np.arange(-0.5, 0.5, 0.05), 
                                                            cmap='RdBu_r')
                                 elif (md == 'um'):
-                                        cf = iplt.contourf(wa, axes=ax, levels=wLevels, cmap=Cmap_w)
+                                        cf = iplt.contourf(wa,axes=ax,levels=wLevels,cmap=Cmap_w)
                                 else: # SGT or MetUM 
-                                        cf = iplt.contourf(wa, axes=ax, levels=wLevels, cmap=Cmap_w)
+                                        cf = iplt.contourf(wa,axes=ax,levels=wLevels,cmap=Cmap_w)
                         print('Finished contour plotting...')
                 # zonal wind
                 elif (var == 'u'):
@@ -549,12 +574,18 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 # ageostrophic wind (u)
                 elif (var == 'ua'):
                         print('Starting contour plotting...')
-                        cf = iplt.contourf(uaa, axes=ax, levels=spdLevels, cmap=Cmap_spd)
+                        if md == 'sgt':
+                                cf = iplt.contourf(uaa, axes=ax, levels=uaLevels, cmap=Cmap_ua)
+                        else: # N768
+                                cf = iplt.contourf(uaa, axes=ax, levels=spdLevels, cmap=Cmap_spd)
                         print('Finished contour plotting...')
                 # ageostrophic wind (v)
                 elif (var == 'va'):
                         print('Starting contour plotting...')
-                        cf = iplt.contourf(vaa, axes=ax, levels=spdLevels, cmap=Cmap_spd)
+                        if md == 'sgt':
+                                cf = iplt.contourf(vaa, axes=ax, levels=uaLevels, cmap=Cmap_ua)
+                        else: # N768
+                                cf = iplt.contourf(vaa, axes=ax, levels=spdLevels, cmap=Cmap_spd)
                         print('Finished contour plotting...')
                 # boundary layer height 
                 elif (var == 'blh'):
@@ -571,15 +602,15 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                         if size == 'reg' and var == 'w':
                                 if md != 'um':
                                         if sim == 'diab':
-                                                skip = 2; vScale = 100; rvec = 5 # SGT (rvec = 5)
-                                        else:
-                                                skip = 2; vScale = 200; rvec = 10 # SGT (rvec = 10) 
+                                                skip = 2; vScale = 35; rvec = 2 # SGT (rvec = 5)
+                                        elif sim == 'geo':
+                                                skip = 2; vScale = 70; rvec = 5 # SGT (rvec = 10) 
+                                        else: # control (full forcing)
+                                                skip = 2; vScale = 150; rvec = 10 #
                                 else:
-                                        skip = 2; vScale = 600; rvec = 20 # MetUM (rvec = 20)
+                                        skip = 2; vScale = 200; rvec = 10 # MetUM (rvec = 20)
                         else:
-                                skip = 2
-                                vScale = 600
-                                rvec = 20
+                                skip = 4; vScale = 200; rvec = 10
 
                 # overlay wind vectors (+ reference vector)
                 print('Adding wind vectors to the plot...')
@@ -593,14 +624,14 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                                 if size == 'reg':
                                         q = iplt.quiver(ua[::skip, ::skip], va[::skip, ::skip], 
                                                         angles='xy', scale=vScale)
-                                        plt.quiverkey(q, 0.08, 0.92, rvec, 
-                                                      r'$20\ \mathrm{m}\ \mathrm{s}^{-1}$',
+                                        plt.quiverkey(q, 0.10, 0.92, rvec, 
+                                                      r'$10\ \mathrm{m}\ \mathrm{s}^{-1}$',
                                                       labelpos='E', coordinates='figure')
                                 elif size == 'ext':
                                         q = iplt.quiver(ua[::skip, ::skip], va[::skip, ::skip], 
                                                         angles='xy', scale=vScale)
-                                        plt.quiverkey(q, 0.08, 0.875, rvec, 
-                                                      r'$20\ \mathrm{m}\ \mathrm{s}^{-1}$',
+                                        plt.quiverkey(q, 0.09, 0.90, rvec, 
+                                                      r'$10\ \mathrm{m}\ \mathrm{s}^{-1}$',
                                                       labelpos='E', coordinates='figure')
                                 else: # zoom
                                         q = iplt.quiver(ua[::skip, ::skip], va[::skip, ::skip], 
@@ -616,12 +647,12 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                                                 angles='xy', scale=vScale)
                                 if md != 'um':
                                         if sim == 'diab':
-                                                plt.quiverkey(q, 0.10, 0.82, rvec, 
-                                                              r'$5\ \mathrm{m}\ \mathrm{s}^{-1}$',
+                                                plt.quiverkey(q, 0.09, 0.90, rvec, 
+                                                              r'$2\ \mathrm{m}\ \mathrm{s}^{-1}$',
                                                               labelpos='E', coordinates='figure')
                                         else:
-                                                plt.quiverkey(q, 0.10, 0.82, rvec, 
-                                                              r'$10\ \mathrm{m}\ \mathrm{s}^{-1}$',
+                                                plt.quiverkey(q, 0.10, 0.90, rvec, 
+                                                              r'$5\ \mathrm{m}\ \mathrm{s}^{-1}$',
                                                               labelpos='E', coordinates='figure')
                                 else:
                                         plt.quiverkey(q, 0.09, 0.82, rvec, 
@@ -655,9 +686,11 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 # add colourbar
                 if var != 'circ':
                         if (size == 'reg'):
-                                plt.colorbar(cf, fraction=0.025, pad=0.06)
+                                plt.colorbar(cf, fraction=0.025, 
+                                             pad=0.06, extend='both').set_label(cb_label)
                         else:
-                                plt.colorbar(cf, fraction=0.032, pad=0.06)
+                                plt.colorbar(cf, fraction=0.032, 
+                                             pad=0.06, extend='both').set_label(cb_label)
                         
                 # output the plot to X11 window
                 if (out == 'x11'):
