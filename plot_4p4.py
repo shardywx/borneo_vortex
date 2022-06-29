@@ -302,9 +302,9 @@ def main(inargs):
                     # when running with end = [6.0, ...], got the error below (different from T+24)
                     # IndexError: index 0 is out of bounds for axis 1 with size 0
                     # same with T+72 below --> probably a simple explanation, but currently not sure 
-                    start = [0.0, 89.0]; end = [0.04, 129.0] # 6º
+                    start = [6.0, 89.0]; end = [6.04, 129.0] # 6º
                 else:
-                    start = [0.0, 89.0]; end = [0.04, 129.0] # 6º 
+                    start = [6.0, 89.0]; end = [6.04, 129.0] # 6º 
 
         elif int(inargs.hr) == 60:
             if inargs.plane == 'ns':
@@ -326,7 +326,7 @@ def main(inargs):
                     start = [2.0, 104.0]; end = [12.0, 104.06] # 102º
             else: # E-W (lon-z) 
                 if inargs.data == '4p4':
-                    start = [0.0, 89.00]; end = [0.04, 129.0] # 10º
+                    start = [7.0, 89.00]; end = [7.04, 129.0] # 10º
                 else:
                     start = [7.0, 89.00]; end = [7.04, 129.0] # 10º
 
@@ -383,12 +383,11 @@ def main(inargs):
 
         # remove unused dimensions --> script won't run if you choose --cs='w' and --data='4p4'
         if inargs.data == '4p4':
-            data = xr.combine_by_coords([data_pc.squeeze(['t', 't_1']),
-                                         data_pd.squeeze(['t', 't_1'])])
+            data = data_4p4
             data = data.reindex(p=data.p[::-1])
             u = data["u"]; v = data["v"]; z = data["ht"]; temp = data["temp"]
             q = data["q"] # * 1000.; q.attrs['units'] = 'g kg-1'
-            omg = data["omega"]
+            omg = data["omega"]; rh = data["rh"]
 
             # interpolate variables onto same grid 
             temp = temp.interp(longitude_1=u["longitude"],latitude_1=u["latitude"],method="linear")
@@ -653,7 +652,7 @@ def main(inargs):
                 arr = rh.sel(latitude=slice(start[0],end[0]),
                              longitude=slice(start[1],end[1]),
                              isobaricInhPa=slice(950.0, 150.0) ).squeeze(var_dim)
-            dl = 5.0; rmin = 40.0; rmax = 100.0; Levels=np.arange(rmin,rmax+dl,dl); Cmap='BuPu'
+            dl = 5.0; rmin = 30.0; rmax = 100.0; Levels=np.arange(rmin,rmax+dl,dl); Cmap='plasma_r'
             cb_label = 'Relative humidity (%)'
 
         elif inargs.var == 'u':
@@ -953,10 +952,10 @@ def main(inargs):
         xint = 1; yint = 4
         if inargs.plane == 'ns':
             ts = np.rint(arr.latitude[0].data); tf = np.rint(arr.latitude[-1].data)
-            dim_size = len(arr.latitude); ax.set_xlabel('Latitude (degrees north)')
+            dim_size = len(arr.latitude); ax.set_xlabel(r'Latitude ($\degree$N)', fontsize='large')
         else: 
             ts = np.rint(arr.longitude[0].data); tf = np.rint(arr.longitude[-1].data)
-            dim_size = len(arr.longitude); ax.set_xlabel('Longitude (degrees east)')
+            dim_size = len(arr.longitude); ax.set_xlabel(r'Longitude ($\degree$E)', fontsize='large')
 
         # x-axis tickmarks every 2º 
         ax.set_xlim(0, dim_size-1)
@@ -964,24 +963,24 @@ def main(inargs):
             ax.set_xticks(np.arange(0, dim_size+1, 100) )
         else: # ERA5, N768, SGT --> elif inargs.data == 'era5':
             ax.set_xticks(np.arange(0, dim_size+1, 16) )
-        ax.set_xticklabels(np.arange(ts, tf+1, yint) )
+        ax.set_xticklabels(np.arange(int(ts), int(tf+1), yint) , fontsize='large')
 
         # y-axis tickmarks and labels 
         if inargs.data == '4p4':
             plev_size = len(arr.p); ps = np.rint(arr.p[0].data); pf = np.rint(arr.p[-1].data)
             ax.set_yticks(np.arange(0, plev_size, 1) )
-            ax.set_yticklabels(arr.p.data); ax.set_ylabel('Pressure (hPa)')
+            ax.set_yticklabels(arr.p.data); ax.set_ylabel('Pressure (hPa)', fontsize='large')
         elif inargs.data == 'era5':
             plev_size = len(arr.isobaricInhPa)
             ps = np.rint(arr.isobaricInhPa[0].data); pf = np.rint(arr.isobaricInhPa[-1].data)
             ax.set_yticks(np.arange(0, plev_size, 1) )
-            ax.set_yticklabels(arr.isobaricInhPa.data); ax.set_ylabel('Pressure (hPa)')
+            ax.set_yticklabels(arr.isobaricInhPa.data); ax.set_ylabel('Pressure (hPa)', fontsize='large')
         else:
             mlev_size = len(arr.height_levels)
             ax.set_yticks(np.arange(0, mlev_size, 4) )
-            ax.set_yticklabels(arr.height_levels[::4].data); ax.set_ylabel('Height (m)')
+            ax.set_yticklabels(arr.height_levels[::4].data); ax.set_ylabel('Height (m)', fontsize='large')
 
-        var_cbar.set_label(cb_label)
+        var_cbar.set_label(cb_label, fontsize='large')
         plt.savefig(fili,dpi=200)
 
 def extract_vortex_info(VORTEX_PATH):
@@ -1044,9 +1043,9 @@ def overlay_lat_lon_labels(variable_arr, ax):
     xint = 5; yint = 3
 
     ax.set_xticks(np.arange(lon0, lon1 + 1, xint))
-    ax.set_xticklabels(np.arange(lon0, lon1 + 1, xint))
+    ax.set_xticklabels(np.arange(lon0, lon1 + 1, xint), fontsize='large')
     ax.set_yticks(np.arange(lat0, lat1 + 1, yint))
-    ax.set_yticklabels(np.arange(lat0, lat1 + 1, yint))
+    ax.set_yticklabels(np.arange(lat0, lat1 + 1, yint), fontsize='large')
 
     return ax
 
@@ -1220,14 +1219,14 @@ def plot_mean_uwind(bounds, vortex_box_radius):
     lat0, lat1 = np.rint([mean_uwind.latitude[0].data, mean_uwind.latitude[-1].data])
     mean_uwind_lat_size = len(mean_uwind.latitude)
 
-    ax.set_xlabel('Latitude (degrees north)')
+    ax.set_xlabel(r'Latitude ($\degree$N)', fontsize='large')
     ax.set_xticks(np.arange(0, mean_uwind_lat_size + 1, 4))
-    ax.set_xticklabels(np.arange(lat0, lat1 + 1, 1))
+    ax.set_xticklabels(np.arange(lat0, lat1 + 1, 1), fontsize='large')
 
     mean_uwind_hgt_size = len(mean_uwind.height_levels)
     ax.set_yticks(np.arange(0, mean_uwind_hgt_size, 4))
     ax.set_yticklabels(mean_uwind.height_levels[::4].data)
-    ax.set_ylabel('Height (m)')
+    ax.set_ylabel('Height (m)', fontsize='large')
 
     mean_uwind_cbar.set_label(colourbar_label)
     ax.grid(True)
