@@ -1370,98 +1370,98 @@ def exner(pres):
     exner = np.power( (pres / p_sfc), (R_d / c_p) )
     return exner
 
-def geo_wind(u, v, pres, rho, f):
-    '''
-    Calculate geostrophic wind components from full horizontal wind 
-    https://github.com/WimUU/Climate-Physics/blob/
-    38d30eab9691820fe20e457e6f8a3030d08e1f7e/Simulation%20of%20Ocean%20Atmosphere%20and%20Climate/
-    Code_Exercise_1.py
-    '''
-    import iris 
-    from windspharm.iris import VectorWind
-    #w = VectorWind(u,v)
-    #px, py = w.gradient(pres, truncation=21)
-    # read in pressure data
-    pres = pres.regrid(u,iris.analysis.Linear())
-    # calculate gradients using Windspharm
-    w = VectorWind(u,v)
-    px0, py0 = w.gradient(pres, truncation=21) 
-    # set constants
-    re = 6371000
-    pi = 3.14159265
-    # calculate gradient using built-in function
-    xn = pres.coord('longitude').points * (pi / 180.)
-    yt = pres.coord('latitude').points * (pi / 180.)
-    # calculate spacing in radian between grid points 
-    nx = pres.shape[1]
-    ny = pres.shape[0]
-    dlon = 4. * pi / nx
-    dlat = 2. * pi / ny
-    # calculate cosine of latitude
-    coslat = np.cos(yt)
-    coslat = coslat.reshape(1, ny, 1)
-    # call function to calculate gradient
-    px = ddlambda_2d(pres.data, re, dlon, coslat)
-    py = ddphi_2d(pres.data, re, dlat)
-    # reshape arrays
-    px = px.reshape(ny,nx)
-    py = py.reshape(ny,nx)
-    # create new Iris cubes containing pressure gradient data
-    pgf_v = pres.copy(data=px)
-    pgf_u = pres.copy(data=py)
-    # define each coriolis term
-    cor_u = (-1/(f * rho))
-    cor_v = (1/(f * rho))
-    # calculate geostrophic wind components 
-    ug = pgf_u
-    ug.data = cor_u * pgf_u.data
-    vg = pgf_v
-    vg.data = cor_v * pgf_v.data
+# def geo_wind(u, v, pres, rho, f):
+#     '''
+#     Calculate geostrophic wind components from full horizontal wind 
+#     https://github.com/WimUU/Climate-Physics/blob/
+#     38d30eab9691820fe20e457e6f8a3030d08e1f7e/Simulation%20of%20Ocean%20Atmosphere%20and%20Climate/
+#     Code_Exercise_1.py
+#     '''
+#     import iris 
+#     from windspharm.iris import VectorWind
+#     #w = VectorWind(u,v)
+#     #px, py = w.gradient(pres, truncation=21)
+#     # read in pressure data
+#     pres = pres.regrid(u,iris.analysis.Linear())
+#     # calculate gradients using Windspharm
+#     w = VectorWind(u,v)
+#     px0, py0 = w.gradient(pres, truncation=21) 
+#     # set constants
+#     re = 6371000
+#     pi = 3.14159265
+#     # calculate gradient using built-in function
+#     xn = pres.coord('longitude').points * (pi / 180.)
+#     yt = pres.coord('latitude').points * (pi / 180.)
+#     # calculate spacing in radian between grid points 
+#     nx = pres.shape[1]
+#     ny = pres.shape[0]
+#     dlon = 4. * pi / nx
+#     dlat = 2. * pi / ny
+#     # calculate cosine of latitude
+#     coslat = np.cos(yt)
+#     coslat = coslat.reshape(1, ny, 1)
+#     # call function to calculate gradient
+#     px = ddlambda_2d(pres.data, re, dlon, coslat)
+#     py = ddphi_2d(pres.data, re, dlat)
+#     # reshape arrays
+#     px = px.reshape(ny,nx)
+#     py = py.reshape(ny,nx)
+#     # create new Iris cubes containing pressure gradient data
+#     pgf_v = pres.copy(data=px)
+#     pgf_u = pres.copy(data=py)
+#     # define each coriolis term
+#     cor_u = (-1/(f * rho))
+#     cor_v = (1/(f * rho))
+#     # calculate geostrophic wind components 
+#     ug = pgf_u
+#     ug.data = cor_u * pgf_u.data
+#     vg = pgf_v
+#     vg.data = cor_v * pgf_v.data
 
-    ug.units = 'm s**-1'
-    vg.units = 'm s**-1'
-    return ug, vg, pgf_u, pgf_v, cor_u, cor_v
+#     ug.units = 'm s**-1'
+#     vg.units = 'm s**-1'
+#     return ug, vg, pgf_u, pgf_v, cor_u, cor_v
 
-def geo_wind_new():
-    '''
-    copy of part of 'diagnostic_plotter.py' used to calculate geostrophic wind 
-    '''
-    # regrid pressure to same grid as wind components                      
-    pres = pres.regrid(ut[lev],iris.analysis.Linear())
-    # set constants                                                        
-    r_e = 6371000.
-    pi = 3.14159265
-    # get grid in radians                                                  
-    xn = pres.coord('longitude').points * (pi / 180.)
-    yt = pres.coord('latitude').points * (pi / 180.)
-    # calculate spacing in radians between grid points                     
-    nx = pres.shape[1]
-    ny = pres.shape[0]
-    dlon = 4. * pi / nx
-    dlat = 2. * pi / ny
-    # calculate cosine of latitude                                         
-    coslat = np.cos(yt)
-    coslat = coslat.reshape(1, ny, 1)
-    # call function to calculate gradient                                  
-    px0 = SG.ddlambda_2d(pres.data, r_e, dlon, coslat)
-    py0 = SG.ddphi_2d(pres.data, r_e, dlat)
-    # reshape arrays                                                       
-    px0 = px0.reshape(ny,nx)
-    py0 = py0.reshape(ny,nx)
-    # create new Iris cubes containing pressure gradient data              
-    pgf_u = pres.copy(data=px0)
-    pgf_v = pres.copy(data=py0)
-    # calculate Coriolis term in geostrophic wind components               
-    f0    = calc_f(ut[lev])
-    f0[f0 == 0] = 0.00002
-    f     = ut[lev].copy(data=f0)
-    f2    = imath.exponentiate(f,2)
-    cor_v = imath.divide(f,f2*rho[lev])
-    cor_u = imath.multiply(imath.divide(f,f2*rho[lev]),-1)
-    # calculate geostrophic wind components                                
-    ug = pgf_u * cor_u; vg = pgf_v * cor_v
-    # add metadata (units)                                                 
-    ug.units = 'm s**-1'; vg.units = 'm s**-1'
+# def geo_wind_new():
+#     '''
+#     copy of part of 'diagnostic_plotter.py' used to calculate geostrophic wind 
+#     '''
+#     # regrid pressure to same grid as wind components                      
+#     pres = pres.regrid(ut[lev],iris.analysis.Linear())
+#     # set constants                                                        
+#     r_e = 6371000.
+#     pi = 3.14159265
+#     # get grid in radians                                                  
+#     xn = pres.coord('longitude').points * (pi / 180.)
+#     yt = pres.coord('latitude').points * (pi / 180.)
+#     # calculate spacing in radians between grid points                     
+#     nx = pres.shape[1]
+#     ny = pres.shape[0]
+#     dlon = 4. * pi / nx
+#     dlat = 2. * pi / ny
+#     # calculate cosine of latitude                                         
+#     coslat = np.cos(yt)
+#     coslat = coslat.reshape(1, ny, 1)
+#     # call function to calculate gradient                                  
+#     px0 = SG.ddlambda_2d(pres.data, r_e, dlon, coslat)
+#     py0 = SG.ddphi_2d(pres.data, r_e, dlat)
+#     # reshape arrays                                                       
+#     px0 = px0.reshape(ny,nx)
+#     py0 = py0.reshape(ny,nx)
+#     # create new Iris cubes containing pressure gradient data              
+#     pgf_u = pres.copy(data=px0)
+#     pgf_v = pres.copy(data=py0)
+#     # calculate Coriolis term in geostrophic wind components               
+#     f0    = calc_f(ut[lev])
+#     f0[f0 == 0] = 0.00002
+#     f     = ut[lev].copy(data=f0)
+#     f2    = imath.exponentiate(f,2)
+#     cor_v = imath.divide(f,f2*rho[lev])
+#     cor_u = imath.multiply(imath.divide(f,f2*rho[lev]),-1)
+#     # calculate geostrophic wind components                                
+#     ug = pgf_u * cor_u; vg = pgf_v * cor_v
+#     # add metadata (units)                                                 
+#     ug.units = 'm s**-1'; vg.units = 'm s**-1'
 
 def reverse_lat(u, v, axis=0):
     '''

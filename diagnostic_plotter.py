@@ -110,24 +110,24 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
         # b/c lat/lon names were incorrect
         subset = iris.Constraint(latitude=lambda z: lat0<z<lat1,longitude=lambda z: lon0<z<lon1)
 
-        # read in global time-mean data (30-day)
-        mdiri  = '/nobackup/earshar/borneo'
-        mfili  = '{0}/op_gl_um_2018octnov_mean.nc'.format(mdiri)
-        mcubes = iris.load(mfili)
-        mean_u = mcubes.extract_strict('eastward_wind')
-        mean_v = mcubes.extract_strict('northward_wind')
+        # # read in global time-mean data (30-day)
+        # mdiri  = '/nobackup/earshar/borneo'
+        # mfili  = '{0}/op_gl_um_2018octnov_mean.nc'.format(mdiri)
+        # mcubes = iris.load(mfili)
+        # mean_u = mcubes.extract_strict('eastward_wind')
+        # mean_v = mcubes.extract_strict('northward_wind')
 
-        # read in waves data (Kelvin, R1, WMRG waves)
-        k_fili = '{0}/uz_Kelvin_rm_clim_6h_k2-40_p2-30_2018.nc'.format(mdiri)
-        r1_fili= '{0}/uvz_R1_rm_clim_6h_kn2-40_p2-30_2018.nc'.format(mdiri)
-        wm_fili= '{0}/uvz_WMRG_rm_clim_6h_kn2-40_p2-30_2018.nc'.format(mdiri) 
-        kcubes = iris.load(k_fili); rcubes = iris.load(r1_fili); wcubes = iris.load(wm_fili)
+        # # read in waves data (Kelvin, R1, WMRG waves)
+        # k_fili = '{0}/uz_Kelvin_rm_clim_6h_k2-40_p2-30_2018.nc'.format(mdiri)
+        # r1_fili= '{0}/uvz_R1_rm_clim_6h_kn2-40_p2-30_2018.nc'.format(mdiri)
+        # wm_fili= '{0}/uvz_WMRG_rm_clim_6h_kn2-40_p2-30_2018.nc'.format(mdiri) 
+        # kcubes = iris.load(k_fili); rcubes = iris.load(r1_fili); wcubes = iris.load(wm_fili)
 
 	# plot filled contours (w, vort, ...)
         if (var == 'blh'):
                 levs = [14]
         else:
-                levs = [18,21,24]#,23,24,25,26,27,28,29,30]
+                levs = [16]#,23,24,25,26,27,28,29,30]
 
 	# loop over vertical levels
         for lev in levs:
@@ -150,10 +150,10 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 ut.rename('zonal wind component')
                 vt.rename('meridional wind component')
 
-                # read in GPM-IMERG precipitation data (30 min interval)
-                pdiri  = '/nobackup/earshar/borneo/'
-                pfili  = '{0}/GPMHH_201810.nc'.format(pdiri)
-                pcubes = iris.load(pfili); gpm_prcp = pcubes.extract_strict('precipitationCal')
+                # # read in GPM-IMERG precipitation data (30 min interval)
+                # pdiri  = '/nobackup/earshar/borneo/'
+                # pfili  = '{0}/GPMHH_201810.nc'.format(pdiri)
+                # pcubes = iris.load(pfili); gpm_prcp = pcubes.extract_strict('precipitationCal')
 
                 # choose single time for analysis 
                 if Tp == 12:
@@ -263,25 +263,25 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 bv_lon = df.loc[0:20, "lon_vort"]
                 bv_time = df.loc[0:20, "Time"]
 
-                # read in precipitation data from 4.4 km forecast
-                pdiri  = '/nobackup/earshar/borneo/'
-                pfili  = '{0}/20181021T1200Z_SEA4_km4p4_ra1tld_pverb.pp'.format(pdiri)
-                pcubes = iris.load(pfili)
-                prcp   = pcubes.extract('stratiform_rainfall_flux')[1]
-                # calculate units, using frequency of input data (either every 1 h or 15 min)
-                ntimes = prcp.shape[0]
-                if ntimes == 120:
-                        prcp = prcp * 3600
-                else:
-                        prcp = prcp * 900
-                prcp.units = 'mm hr**-1'
-                # focus on subset of times  
-                # EDIT --> MetUM precip data look strange, even though max/min are sensible
-                um_time = iris.Constraint(time = lambda t0: pdt1 <= t0.point <= pdt2)
-                prcp = prcp.extract(um_time) 
-                # calculate accumulated precipitation 
-                prcp = prcp.collapsed('time', iris.analysis.SUM)
-                prcp.rename('accumulated rainfall')
+                # # read in precipitation data from 4.4 km forecast
+                # pdiri  = '/nobackup/earshar/borneo/'
+                # pfili  = '{0}/20181021T1200Z_SEA4_km4p4_ra1tld_pverb.pp'.format(pdiri)
+                # pcubes = iris.load(pfili)
+                # prcp   = pcubes.extract('stratiform_rainfall_flux')[1]
+                # # calculate units, using frequency of input data (either every 1 h or 15 min)
+                # ntimes = prcp.shape[0]
+                # if ntimes == 120:
+                #         prcp = prcp * 3600
+                # else:
+                #         prcp = prcp * 900
+                # prcp.units = 'mm hr**-1'
+                # # focus on subset of times  
+                # # EDIT --> MetUM precip data look strange, even though max/min are sensible
+                # um_time = iris.Constraint(time = lambda t0: pdt1 <= t0.point <= pdt2)
+                # prcp = prcp.extract(um_time) 
+                # # calculate accumulated precipitation 
+                # prcp = prcp.collapsed('time', iris.analysis.SUM)
+                # prcp.rename('accumulated rainfall')
 
                 # also read in 'pb' stream data
                 bnames = '{0}/case_{3}_{2}/umglaa_pb{1:03d}'.format(ddir, Tp-12, res, fcst)
@@ -295,13 +295,13 @@ def diagnostic_plotter(ddir, fcst, Tp, res, sim, md, wind, var, out, size, plane
                 # regrid 'u' onto 'v' grid 
                 ut = ut.regrid(vt,iris.analysis.Linear())
 
-                # regrid time-mean onto MetUM grid 
-                mean_u.coord(axis='x').coord_system = ut.coord(axis='x').coord_system
-                mean_u.coord(axis='y').coord_system = ut.coord(axis='y').coord_system
-                mean_v.coord(axis='x').coord_system = ut.coord(axis='x').coord_system
-                mean_v.coord(axis='y').coord_system = ut.coord(axis='y').coord_system
-                mean_u = mean_u.regrid(ut,iris.analysis.Linear())
-                mean_v = mean_v.regrid(ut,iris.analysis.Linear())
+                # # regrid time-mean onto MetUM grid 
+                # mean_u.coord(axis='x').coord_system = ut.coord(axis='x').coord_system
+                # mean_u.coord(axis='y').coord_system = ut.coord(axis='y').coord_system
+                # mean_v.coord(axis='x').coord_system = ut.coord(axis='x').coord_system
+                # mean_v.coord(axis='y').coord_system = ut.coord(axis='y').coord_system
+                # mean_u = mean_u.regrid(ut,iris.analysis.Linear())
+                # mean_v = mean_v.regrid(ut,iris.analysis.Linear())
 
                 # model level array 
                 ht_levs = ut.coord('level_height') 

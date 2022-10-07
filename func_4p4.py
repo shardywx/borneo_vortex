@@ -112,7 +112,7 @@ def subset(data, bounds, var='', vtime=[]):
 
     # use select function to subset data                                                 
     if var == 'circ':
-        if dset == '4p4':
+        if dataset == '4p4':
             data = data.sel( longitude = slice(bounds[0], bounds[1]),
                              latitude = slice(bounds[2], bounds[3]),
                              longitude_1 = slice(bounds[0], bounds[1]),
@@ -123,7 +123,7 @@ def subset(data, bounds, var='', vtime=[]):
                              longitude = slice(bounds[0], bounds[1]),
                              latitude = slice(bounds[2], bounds[3]) )
     else:
-        if dset == '4p4':
+        if dataset == '4p4':
             data = data.sel( t_1=slice(vtime,vtime), t=slice(vtime,vtime),
                              longitude=slice(bounds[0], bounds[1]),
                              latitude=slice(bounds[2], bounds[3]),

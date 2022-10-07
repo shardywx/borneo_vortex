@@ -45,7 +45,9 @@ def main(inargs):
 
     # FUNCTION 3 --> plot Himawari brightness temperature data
     if inargs.var == 'hima':
-        himawari_plot = plot_t_bright_himawari(date_str, bounds, VORTEX_PATH)
+        single_date_str = date_str.strftime("%Y%m%d_%H00")
+        himawari_path = '/nobackup/earshar/borneo/himawari/himawari_10.4_{0}.nc'.format(single_date_str)
+        himawari_plot = plot_t_bright_himawari(single_date_str, bounds, himawari_path, VORTEX_PATH)
     # FUNCTION 4 --> produce time-series plot of accumulated precipitation
     elif inargs.var == 'prcp':
         prcp_time_series_plot = plot_prcp_time_series(bounds, VORTEX_PATH, inargs.r0)
@@ -1009,28 +1011,38 @@ def define_plot_bounds(plot_type):
     return bounds
 
 
-def plot_t_bright_himawari(date_str, bounds, vortex_path):
+def plot_t_bright_himawari(single_date_str, bounds, himawari_path, vortex_path):
 
-    single_date_str = date_str.strftime("%Y%m%d_%H00")
-    HIMAWARI_PATH = '/nobackup/earshar/borneo/himawari/himawari_10.4_{0}.4p4km.nc'.format(single_date_str)
     OUT_PATH = './himawari_t_bright_{0}.png'.format(single_date_str)
-    himawari_data = xr.open_dataset(HIMAWARI_PATH).metpy.parse_cf()
-    himawari_data = himawari_data.sel(longitude=slice(bounds[0], bounds[1]),
-                                      latitude=slice(bounds[2], bounds[3]))
+    himawari_data = xr.open_dataset(himawari_path).metpy.parse_cf()
+    # himawari_data = himawari_data.sel(longitude=slice(bounds[0], bounds[1]),
+    #                                   latitude=slice(bounds[2], bounds[3]))
+    himawari_data = himawari_data.sel(lon=slice(bounds[0], bounds[1]),
+                                      lat=slice(bounds[2], bounds[3]))
     t_bright = himawari_data.T_b
 
-    fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))
+    # fig = plt.figure(figsize=(9, 6))
+    # ax = fig.add_subplot(111, projection=ccrs.PlateCarree(central_longitude=0))
+    fig, ax = plt.subplots(figsize=(9, 6), subplot_kw={'projection': ccrs.PlateCarree()})
     ax.add_feature(cfeature.COASTLINE.with_scale('50m'), edgecolor='blue', linewidth=1.0)
     plt.gca().gridlines(color='grey', linestyle='--', linewidth=0.5)
-    ax = overlay_lat_lon_labels(t_bright, ax)
+
+    # ax = overlay_lat_lon_labels(t_bright, ax)
 
     t_bright.plot.contourf(ax=ax, extend='max', transform=ccrs.PlateCarree(),
                            cbar_kwargs={'label': 'K'},
                            cmap='gist_yarg')
 
-    fig = overlay_vortex_position(vortex_path, t_bright, fig)
-    plt.title('')
+    # customise plot      
+    ax.set_xticks([94, 99, 104, 109, 114, 119])
+    ax.set_yticks([-2, 1, 4, 7, 10, 13, 16, 19])
+    ax.set_xticklabels([94, 99, 104, 109, 114, 119], fontsize='large')
+    ax.set_yticklabels([-2, 1, 4, 7, 10, 13, 16, 19], fontsize='large')
+    ax.set_xlabel(r'longitude ($\degree$E)', fontsize='large')
+    ax.set_ylabel(r'latitude ($\degree$N)', fontsize='large')
+    ax.set_title('')
+
+    # fig = overlay_vortex_position(ax, vortex_path, t_bright, fig)
     plt.savefig(OUT_PATH, dpi=200)
 
     return fig
@@ -1038,28 +1050,31 @@ def plot_t_bright_himawari(date_str, bounds, vortex_path):
 
 def overlay_lat_lon_labels(variable_arr, ax):
 
-    lon0, lon1 = np.rint([variable_arr.longitude[0].data, variable_arr.longitude[-1].data])
-    lat0, lat1 = np.rint([variable_arr.latitude[0].data, variable_arr.latitude[-1].data])
+    lon0, lon1 = np.rint([variable_arr.lon[0].data, variable_arr.lon[-1].data])
+    lat0, lat1 = np.rint([variable_arr.lat[0].data, variable_arr.lat[-1].data])
     xint = 5; yint = 3
 
     ax.set_xticks(np.arange(lon0, lon1 + 1, xint))
     ax.set_xticklabels(np.arange(lon0, lon1 + 1, xint), fontsize='large')
     ax.set_yticks(np.arange(lat0, lat1 + 1, yint))
     ax.set_yticklabels(np.arange(lat0, lat1 + 1, yint), fontsize='large')
+    ax.set_xlabel(r'longitude ($\degree$E)', fontsize='large')
+    ax.set_ylabel(r'latitude ($\degree$N)', fontsize='large')
 
     return ax
 
 
-def overlay_vortex_position(vortex_path, variable_arr, fig):
+def overlay_vortex_position(ax, vortex_path, variable_arr, fig):
 
     bv_lat, bv_lon, bv_time = extract_vortex_info(vortex_path)
 
+    vort_box_radius = 3.0
     filter = bv_time == variable_arr.coords['time'].data
     time_match = bv_time.where(filter).notna()
     ind = int(time_match.loc[time_match == True].index.values)
 
-    ax.add_patch(Rectangle((bv_lon[ind] - inargs.r0, bv_lat[ind] - inargs.r0),
-                           2 * inargs.r0, 2 * inargs.r0, linewidth=2,
+    ax.add_patch(Rectangle((bv_lon[ind] - vort_box_radius, bv_lat[ind] - vort_box_radius),
+                           2 * vort_box_radius, 2 * vort_box_radius, linewidth=2,
                            facecolor='none', edgecolor='c'))
 
     return fig
