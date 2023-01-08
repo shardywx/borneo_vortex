@@ -479,6 +479,9 @@ def main(inargs):
             # now calculate effective PV gradient (q / N^2)
             pv_grad = (q_gl / th_dz) #/ 10000.
 
+            # new moist stability calculation (January 2023)
+            moist_stability = q_gl * th_dz * 1000000000.
+
             # interpolate to N768 grid 
             u_sg = data_sgt['u'].interp(longitude=u_gl["longitude"],latitude=u_gl["latitude"],method="linear")
             v_sg = data_sgt['v'].interp(longitude=v_gl["longitude"],latitude=v_gl["latitude"],method="linear")
@@ -590,7 +593,7 @@ def main(inargs):
             cb_label = 'Potential temperature (K)'
 
 
-        # effective PV gradient (q / N^2)
+        # effective PV gradient (r / N^2)
         elif inargs.var == 'n2':
             if inargs.data == 'n768':
                 if inargs.plane == 'ns':
@@ -610,7 +613,28 @@ def main(inargs):
                 dl = 5.0; qmin = 0.0; qmax = 100.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
                 cb_label=r'$q/N^2\,(s^{-2})$'
 
-            
+
+        # moist stability (r * N^2) --> January 2023
+        elif inargs.var == 'moist_stability':
+            if inargs.data == 'n768':
+                if inargs.plane == 'ns':
+                    arr = moist_stability.sel(longitude=start[1], method="nearest")
+                    arr = arr.sel(latitude=slice(start[0],end[0]),
+                                  height_levels=slice(50, 15000) )
+                else:
+                    arr = moist_stability.sel(latitude=start[0], method="nearest")
+                    arr = arr.sel(longitude=slice(start[1],end[1]),
+                                  height_levels=slice(50, 15000) )
+                    dl = 0.5; qmin = 0.0; qmax = 5.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
+                    cb_label=r'$rN^2\,(s^{-2})$'
+            elif inargs.data == '4p4':
+                arr = moist_stability.sel(latitude=slice(start[0],end[0]),
+                                  longitude=slice(start[1],end[1]),
+                                  p=slice(1000.0, 150.0) ).squeeze(var_dim)
+                dl = 0.5; qmin = 0.0; qmax = 5.0; Levels = np.arange(qmin,qmax+dl,dl); Cmap='plasma_r'
+                cb_label=r'$rN^2\,(s^{-2})$'
+
+
         # specific humidity 
         elif inargs.var == 'q':
             if inargs.data == '4p4':
@@ -1107,6 +1131,7 @@ def plot_prcp_time_series(bounds, vortex_path, vortex_box_radius):
 
     for i, t in enumerate(Tp):
         METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pa{0:03d}.nc'.format(t - 12)
+        # METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768_v2/umglaa_pa{0:03d}.nc'.format(t - 12)
         data_n768_metum = xr.open_dataset(METUM_N768_PATH)
         data_n768_metum=data_n768_metum["tot_precip"].squeeze('t_1').squeeze('surface').sel(longitude=slice(bounds[0],
                                                                                                             bounds[1]),
@@ -1299,6 +1324,7 @@ def read_n768_metum_heating(bounds, output_time):
         time_str = int(output_time) - 12
 
     METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pc{time_str:03d}.nc'
+    # METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768_v2/umglaa_pc{time_str:03d}.nc'
 
     data_n768_pc = xr.open_dataset(METUM_N768_PATH,drop_variables=['unspecified_5','unspecified_6',
                                                                    'unspecified_9','unspecified_10'])
@@ -1318,6 +1344,7 @@ def read_n768_metum_heating(bounds, output_time):
 def read_all_n768_metum(bounds):
 
     METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa_pe*.nc'
+    # METUM_N768_PATH = '/nobackup/earshar/borneo/case_20181021T1200Z_N768_v2/umglaa_pe*.nc'
     data_n768_metum = xr.open_mfdataset(METUM_N768_PATH, combine='by_coords', chunks={"t": 5}).metpy.parse_cf()
     data_n768_metum = data_n768_metum.sel(longitude=slice(bounds[0], bounds[1]),
                                           latitude=slice(bounds[2], bounds[3]),
@@ -1345,6 +1372,7 @@ def read_data(data_type, output_time, sgt_run, bounds):
     ERA5_PATH = f'/nobackup/earshar/borneo/bv_oct2018.grib'
     SGT_TOOL_PATH = f'/nobackup/earshar/borneo/SGTool/N768/oct/{sgt_run}/filter_4_8/conv_g7x_v5/'
     METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768/nc/umglaa'
+    # METUM_N768_PATH = f'/nobackup/earshar/borneo/case_20181021T1200Z_N768_v2/umglaa'
 
     if data_type == '4p4':
         start_fcst_str, date_str, tstr, data_pc, data_pd = fp.open_file(METUM_4p4_PATH, output_time, file_type='4p4')
