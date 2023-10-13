@@ -716,13 +716,13 @@ def factor1(lat, lat1_deg=4.0, lat2_deg=8.0):
     print('tropical filter factor: min = {0}, max = {1}'.format(np.min(factor1),np.max(factor1)) )
     return factor1
 
-def gkern(kernlen, nsig): 
+def gkern(kernel_length: int, nsig: float): 
     '''
-    returns a 2D Gaussian kernel (for use in convolution)
+    returns a 2D Gaussian kernel with side-length (for use in convolution)
     stackoverflow.com/questions/29731726/how-to-calculate-a-gaussian-kernel-matrix-efficiently-in-numpy
     http://homepages.inf.ed.ac.uk/rbf/HIPR2/gsmooth.htm
     '''
-    x = np.linspace(-nsig, nsig, kernlen+1)
+    x = np.linspace(-nsig, nsig, kernel_length+1)
     kern1d = np.diff(st.norm.cdf(x))
     kern2d = np.outer(kern1d, kern1d)
     return kern2d/kern2d.sum()
